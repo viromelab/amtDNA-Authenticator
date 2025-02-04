@@ -1,2 +1,0 @@
-[console_scripts]
-authpipe = authpipe.__main__:main

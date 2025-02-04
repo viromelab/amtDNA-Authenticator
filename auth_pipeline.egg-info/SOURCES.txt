@@ -1,9 +1,0 @@
-README.md
-setup.py
-auth_pipeline.egg-info/PKG-INFO
-auth_pipeline.egg-info/SOURCES.txt
-auth_pipeline.egg-info/dependency_links.txt
-auth_pipeline.egg-info/entry_points.txt
-auth_pipeline.egg-info/top_level.txt
-authpipe/__init__.py
-authpipe/__main__.py

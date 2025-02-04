@@ -23,7 +23,10 @@ from sklearn.metrics import roc_auc_score, average_precision_score
 from colorama import Fore, Back, Style
 
 LABEL_SIZE = 16
-N_CENTURIES = 60
+N_SLICES = 60
+
+lbound = None
+rbound = None
 
 # Set the font size for tick labels
 plt.rcParams['xtick.labelsize'] = LABEL_SIZE  # For x-axis tick labels
@@ -43,6 +46,7 @@ samples_train = {}
 samples_test = {}
 samples_val = {}
 
+window = None
 
 def printWarningMessage(message):
     print(Fore.YELLOW + Style.BRIGHT + '[WARNING]', end=' ')
@@ -75,9 +79,10 @@ def is_number(s):
 # Load data from multifasta
 
 
-def read_multifasta(multifasta_file_path):
-    global samples, this_file_path, N_CENTURIES
+def read_multifasta():
+    global samples, this_file_path, N_SLICES, window
 
+    multifasta_file_path = os.path.join(context_path, 'multifasta.fa')
     multifasta_file = open(multifasta_file_path, 'r')
     multifasta = multifasta_file.read()
     multifasta = multifasta.upper()
@@ -93,9 +98,9 @@ def read_multifasta(multifasta_file_path):
         try:
             raw_header = sample[0]
             header = raw_header.replace('>', '')
-            header = header.split(' ')
+            header = header.split('_')
             id = header[0]
-            age = header[1]
+            age = header[-1]
 
             if not is_number(age):
                 msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
@@ -107,7 +112,7 @@ def read_multifasta(multifasta_file_path):
             if age > max_age:
                 max_age = age
                 
-            seq = sample[1]
+            seq = sample[1].replace('\n', '')
 
             if id in samples:
                 msg = 'Repeated sample with id ' + id
@@ -118,15 +123,13 @@ def read_multifasta(multifasta_file_path):
             msg = 'Could not process sample with id ' + id
             printErrorMessage(msg)
             
-    N_CENTURIES = int(max_age/100)
-
-
+    N_SLICES = int(max_age/window)
+    
 def divide_set():
-    global samples, samples_train, samples_test, samples_val
+    global samples, samples_train, samples_test
 
-    train_file_path = os.path.join(context_path, 'trainset_index.txt')
-    val_file_path = os.path.join(context_path, 'valset_index.txt')
-    test_file_path = os.path.join(context_path, 'testset_index.txt')
+    train_file_path = os.path.join(context_path, 'train_multifasta.fa')
+    test_file_path = os.path.join(context_path, 'test_multifasta.fa')
 
     # Convert map to list
     samples_list = list(samples.items())
@@ -138,87 +141,134 @@ def divide_set():
     train_proportion = 0.7
     samples_train = samples_list[0:int(samples_size*train_proportion)]
     #
-    val_proportion = 0.2
-    samples_val = samples_list[int(
-        samples_size*train_proportion):int(samples_size*(train_proportion+val_proportion))]
-    #
     samples_test = samples_list[int(
-        samples_size*(train_proportion+val_proportion)):]
+        samples_size*train_proportion):]
 
     # Convert back to map
     samples = dict(samples_list)
     samples_train = dict(samples_train)
-    samples_val = dict(samples_val)
     samples_test = dict(samples_test)
 
     with open(train_file_path, 'w') as file:
-        for id in samples_train.keys():
-            file.write(id)
+        for key in samples_train.keys():
+            sample = samples_train[key]
+            id = sample[0]
+            age = sample[1]
+            header = '>' + id + ' ' + str(age)
+            seq = sample[2].replace('\n', '')
+
+            file.write(header)
             file.write('\n')
-    with open(val_file_path, 'w') as file:
-        for id in samples_val.keys():
-            file.write(id)
+            file.write(seq)
             file.write('\n')
+            
     with open(test_file_path, 'w') as file:
-        for id in samples_test.keys():
-            file.write(id)
+        for key in samples_test.keys():
+            sample = samples_test[key]
+            id = sample[0]
+            age = sample[1]
+            header = '>' + id + ' ' + str(age)
+            seq = sample[2].replace('\n', '')
+
+            file.write(header)
+            file.write('\n')
+            file.write(seq)
             file.write('\n')
 
 
 def load_sets():
     global samples, samples_train, samples_test, samples_val
 
-    train_file_path = os.path.join(context_path, 'trainset_index.txt')
-    val_file_path = os.path.join(context_path, 'valset_index.txt')
-    test_file_path = os.path.join(context_path, 'testset_index.txt')
+    train_file_path = os.path.join(context_path, 'train_multifasta.fa')
+    test_file_path = os.path.join(context_path, 'test_multifasta.fa')
+
+    max_age = 0
 
     if os.path.exists(train_file_path):
         with open(train_file_path, 'r') as file:
-            train_ids = file.readlines()
-            train_ids = [id.replace('\n', '') for id in train_ids]
+            pattern = re.compile(r'>(.*?)\n([\s\S]*?)(?=\n>|\Z)', re.DOTALL)
 
-            for id in train_ids:
-                samples_train[id] = samples[id]
+            train_multifasta = file.read()
+            train_multifasta = train_multifasta.upper()
+            fastas_content = pattern.findall(train_multifasta)
+            
+            for sample in fastas_content:
+                    raw_header = sample[0]
+                    
+                    header = raw_header.replace('>', '')
+                    header = header.split('_')
+                    id = header[0]
+                    age = header[-1]
+                    
+                    if not is_number(age):
+                        msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
+                        printWarningMessage(msg)
+                        continue
+                    
+                    age = float(age)
 
-        with open(val_file_path, 'r') as file:
-            val_ids = file.readlines()
-            val_ids = [id.replace('\n', '') for id in val_ids]
+                    if age > max_age:
+                        max_age = age
+                        
+                    seq = sample[1].replace('\n', '')
 
-            for id in val_ids:
-                samples_val[id] = samples[id]
+                    if id in samples:
+                        msg = 'Repeated sample with id ' + id
+                        printWarningMessage(msg)
 
+                    samples_train[id] = [id, age, seq]
+    else:
+        msg = 'Could not find Train FASTA files to load.'
+        printErrorMessage(msg)
+        exit()
+        
+    if os.path.exists(test_file_path):
         with open(test_file_path, 'r') as file:
-            test_ids = file.readlines()
-            test_ids = [id.replace('\n', '') for id in test_ids]
+            pattern = re.compile(r'>(.*?)\n([\s\S]*?)(?=\n>|\Z)', re.DOTALL)
 
-            for id in test_ids:
-                samples_test[id] = samples[id]
+            test_multifasta = file.read()
+            test_multifasta = test_multifasta.upper()
+            fastas_content = pattern.findall(test_multifasta)
+            
+            for sample in fastas_content:
+                raw_header = sample[0]
+                header = raw_header.replace('>', '')
+                header = header.split(' ')
+                id = header[0]
+                age = header[-1]
+
+                if not is_number(age):
+                    msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
+                    printWarningMessage(msg)
+                    continue
+                
+                age = float(age)
+
+                if age > max_age:
+                    max_age = age
+                    
+                seq = sample[1]
+
+                if id in samples:
+                    msg = 'Repeated sample with id ' + id
+                    printWarningMessage(msg)
+
+                samples_test[id] = [id, age, seq]
 
     else:
-        msg = 'Could not find Train/Val/Test files to load. Try running again from phase \'multifasta\''
+        msg = 'Could not find Test FASTA files to load.'
         printErrorMessage(msg)
+        exit()
+        
+    samples = {**samples_train, **samples_test}
+
 
 ## Calculate FALCON scores
 def get_falcon_scores():
-    global samples, samples_train, samples_test, samples_val
+    global samples, samples_train, samples_test, samples_val, context_path
 
-    # Build train multifasta
     train_multifasta_file_name = os.path.join(context_path, 'train_multifasta.fa')
-    train_multifasta_file = open(train_multifasta_file_name, 'w')
-    for key in samples_train.keys():
-        sample = samples_train[key]
-        id = sample[0]
-        age = sample[1]
-        header = '>' + id + ' ' + str(age)
-        seq = sample[2].replace('\n', '')
-
-        train_multifasta_file.write(header)
-        train_multifasta_file.write('\n')
-        train_multifasta_file.write(seq)
-        train_multifasta_file.write('\n')
-
-    train_multifasta_file.close()
-
+    
     # Run on Falcon
     count = 1
     samples_len = len(samples.keys())
@@ -436,8 +486,8 @@ def extract_features():
 def plot_binary_auroc_auprc(auroc_arr, auprc_arr):
     figure, axis = plt.subplots(1, 1)  # Adjust figure size if needed
 
-    axis.plot(range(1, N_CENTURIES), auroc_arr, color='blue', label='AUROC')
-    axis.plot(range(1, N_CENTURIES), auprc_arr, color='red', label='AUPRC')
+    axis.plot(range(1, N_SLICES), auroc_arr, color='blue', label='AUROC')
+    axis.plot(range(1, N_SLICES), auprc_arr, color='red', label='AUPRC')
 
     axis.set_xlabel('Generations Ago Threshold Cut')  # Add labels to the axis
     axis.set_ylabel('Score')
@@ -467,12 +517,12 @@ def plot_binary_hist_dist(samples_per_century_array):
 def plot_binary_perf(acc, precision, recall, f1, y_true_random, y_pred_random, false_predictions, random_array):
     figure, axis = plt.subplots(1, 1)
 
-    axis.plot(range(1, N_CENTURIES), acc, color='blue', label='Accuracy')
-    axis.plot(range(1, N_CENTURIES), false_predictions,
+    axis.plot(range(1, N_SLICES), acc, color='blue', label='Accuracy')
+    axis.plot(range(1, N_SLICES), false_predictions,
               color='red', alpha=0.5, label='False Predictions')
-    axis.plot(range(1, N_CENTURIES), random_array, color='green',
+    axis.plot(range(1, N_SLICES), random_array, color='green',
               linestyle='dashed', alpha=0.5, label='Random')
-    axis.plot(range(1, N_CENTURIES), f1, color='black', label='F1 Score')
+    axis.plot(range(1, N_SLICES), f1, color='black', label='F1 Score')
 
     axis.legend(loc='center right')
 
@@ -617,7 +667,7 @@ def plot():
 
 
 def load_features():
-    global df_train, df_val, df_test
+    global df_train, df_val, df_test, N_SLICES, window
 
     df_train_path = os.path.join(context_path, 'trainset_features.csv')
     df_train = pd.read_csv(df_train_path)
@@ -627,6 +677,11 @@ def load_features():
 
     df_test_path = os.path.join(context_path, 'testset_features.csv')
     df_test = pd.read_csv(df_test_path)
+    
+    max_age = max(df_train['age'].max(), df_test['age'].max())
+    max_age = max(max_age, df_val['age'].max())
+
+    N_SLICES = int(max_age/window)
 
 
 def train(threshold, model_name):
@@ -720,6 +775,8 @@ def test(threshold, model_name):
 
 
 def train_authenticator(model_name):
+    global window, N_SLICES, rbound, lbound
+    
     auroc_array = []
     auprc_array = []
     acc_array = []
@@ -735,15 +792,21 @@ def train_authenticator(model_name):
     C10_array = []
     C11_array = []
     f1_weighted_array = []
-    samples_per_century_array = {i: 0 for i in range(0, N_CENTURIES)}
 
-    for threshold in range(1, N_CENTURIES):
+    max_lim = int(rbound/window)
+    min_lim = int(lbound/window)
+    
+    N_SLICES = max_lim - min_lim + 1
+
+    samples_per_century_array = {i: 0 for i in range(0, N_SLICES)}
+    
+    for threshold in range(min_lim, max_lim):
         if not verbose:
-            print(f'\r{threshold}/{N_CENTURIES}')
+            print(f'\r{threshold}/{N_SLICES - 1}')
 
-        train(threshold=100*threshold, model_name=model_name)
+        train(threshold=window*threshold, model_name=model_name)
         acc, precision, recall, f1, y_true, y_pred, cm, y_true_categories, auroc, auprc = test(
-                threshold=100*threshold, model_name=model_name)
+                threshold=window*threshold, model_name=model_name)
 
         auroc_array.append(auroc)
         auprc_array.append(auprc)
@@ -763,7 +826,7 @@ def train_authenticator(model_name):
                             num_of_positives) / num_of_samples
 
         random_array.append(random_val)
-
+        
         f1_weighted = f1_score(y_true, y_pred, average='weighted')
 
         f1_weighted_array.append(f1_weighted)
@@ -777,7 +840,7 @@ def train_authenticator(model_name):
         y_true_categories_unique = list(set(y_true_categories))
 
         samples_per_century = {i: y_true_categories.count(
-            i) for i in y_true_categories_unique if i < N_CENTURIES}
+            i) for i in y_true_categories_unique if i < N_SLICES}
 
         for key in samples_per_century.keys():
             samples_per_century_array[key] += samples_per_century[key]
@@ -801,7 +864,7 @@ def train_authenticator(model_name):
 
 
 def main():
-    global samples, verbose, context_path
+    global samples, verbose, context_path, window, rbound, lbound
 
     parser = ArgumentParser()
 
@@ -832,8 +895,28 @@ def main():
         default='XGBoost'
     )
     
+    parser.add_argument(
+        '--window',
+        choices=['10', '100', '1000'],
+        help="The time window to use in training phase [Default: 100] :\n"
+        "  - 10: 10 years threshold cuts.\n"
+        "  - 100: 100 years threshold cuts.\n"
+        "  - 1000: 1000 years threshold cuts.\n",
+        default='100'
+    )
+    
+    parser.add_argument(
+        '--rbound',
+        help="The max time considered for the threshold sliding"
+    )
+    
+    parser.add_argument(
+        '--lbound',
+        help="The min time considered for the threshold sliding"
+    )
+    
     parser.add_argument('--context', help='Path to folder to store/retrieve application context [Will be created if does not exist]', required=True)
-
+    
     parser.add_argument('--perf', action='store_true', help='Output plot of training\'s performance indicators [File perf_ind.png in running folder]')
     
     # Set tools from command line
@@ -848,6 +931,11 @@ def main():
     # Get arguments from command line
     args: Namespace = parser.parse_args()
 
+    rbound = float(args.rbound)
+    lbound = float(args.lbound)
+    
+    window = float(args.window)
+    
     context_path = args.context
     
     subprocess.run(['mkdir', '-p', context_path + '/.tops/'])
@@ -857,25 +945,24 @@ def main():
 
     next_phase = ''
     if args.phase == 'multifasta':
-        multifasta_file_path = args.divset
-        read_multifasta(multifasta_file_path)
+        read_multifasta()
         divide_set()
         extract_features()
-        next_phase = 'feature_extraction'
-    
-    if next_phase == 'feature_extraction' or args.phase == 'feature_extraction':
+        train_authenticator(model_name)
+
+    elif args.phase == 'feature_extraction':
         load_sets()
         extract_features()
-        next_phase = 'training'
+        train_authenticator(model_name)
     
-    if next_phase == 'training' or args.phase == 'training':
+    elif args.phase == 'training':
         load_features()
         train_authenticator(model_name)
         
-    if args.phase == 'auth':
+    elif args.phase == 'auth':
         pass
         
-    if args.verbose:
+    elif args.verbose:
         verbose = True
 
     # if args.PCA:
