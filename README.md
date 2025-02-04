@@ -1,6 +1,6 @@
-<img src="figures/ai_mt.jpeg" alt="Alt Text" width="400" height="400">
+<img src="figures/ai_mt.png" alt="Alt Text" width="800" height="400">
 
-# Ancient DNA Age Prediction
+# A Machine Learning Tool for Authentication of Human Mitochondrial Ancient DNA
 
 This repository contains code for a feature based machine learning tool for predicting the age of ancient DNA samples. The pipeline uses FALCON scores and quantitative features (relative size, CG content, N content) extracted from the DNA sequences.
 
