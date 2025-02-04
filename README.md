@@ -1,14 +1,16 @@
 <img src="figures/ai_mt.png" alt="Alt Text" width="800" height="400">
 
+
 # A Machine Learning Tool for Authentication of Human Mitochondrial Ancient DNA
 
-This repository contains code for a feature based machine learning tool for predicting the age of ancient DNA samples. The pipeline uses FALCON scores and quantitative features (relative size, CG content, N content) extracted from the DNA sequences.
+This repository contains code for a feature based machine learning tool for authenticating ancient DNA samples. The pipeline uses FALCON scores and quantitative features (relative size, CG content, N content) extracted from the DNA sequences.
+
 
 ## Features
 
-* **FALCON Scores:**  Utilizes FALCON to generate similarity scores between the input ancient DNA and a reference database of ancient DNA sequences.
+* **FALCON Scores:**  Utilizes FALCON to generate similarity scores between the input DNA sequence and a reference database of DNA sequences.
 * **Quantitative Features:** Extracts features like relative size, CG content, and N content from the DNA sequences.
-* **Machine Learning Models:** Trains and evaluates different machine learning models (XGBoost, KNN, Neural Network, SVM, Gaussian Naive Bayes) for age prediction.
+* **Machine Learning Models:** Trains and evaluates different machine learning models (XGBoost, KNN, Neural Network, SVM, Gaussian Naive Bayes) for ancient DNA authentication.
 * **Binary Classification:** Predicts whether a sample is above or below a certain age threshold.
 * **Performance Evaluation:**  Includes metrics like accuracy, precision, recall, F1-score, AUROC, and AUPRC.
 
@@ -24,6 +26,7 @@ This repository contains code for a feature based machine learning tool for pred
 * FALCON (needs to be installed separately)
 * colorama
 
+
 ## Usage
 
 1. **Prepare Data:**
@@ -37,6 +40,7 @@ This repository contains code for a feature based machine learning tool for pred
     * You can change the `--model` argument to use a different machine learning model.
     * The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
 
+
 ## Phases
 
 The pipeline can be run in different phases:
@@ -46,14 +50,12 @@ The pipeline can be run in different phases:
 * **training:** Assumes the features are already extracted and proceeds with model training.
 * **auth:**  Authenticates a new FASTA sequence using a pre-trained model (not implemented in the provided code).
 
+
 ## Output
 
 * The trained model is saved in the `models` directory inside the context directory passed in command line.
 * Performance metrics and plots are generated using pyplot and can be saved locally.
 
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
