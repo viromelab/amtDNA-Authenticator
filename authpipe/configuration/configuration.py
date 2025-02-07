@@ -1,0 +1,26 @@
+class Settings:
+    def __init__(self):
+        self.context_path = None
+        self.window = None
+        self.rbound = None
+        self.lbound = None
+        self.df_train = None
+        self.df_val = None
+        self.df_test = None
+        self.plot_mode = False
+        self.verbose = False
+        self.samples = {}
+        self.samples_train = {}
+        self.samples_test = {}
+        self.samples_val = {}
+        self.execution_path = None
+        self.n_intervals = None
+        
+    def update(self, updates):
+        for key, value in updates.items():
+            if hasattr(self, key): 
+                setattr(self, key, value)
+            else:
+                print(f"Warning: Setting '{key}' not found.") 
+
+settings = Settings() 
