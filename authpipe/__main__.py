@@ -95,33 +95,29 @@ def read_multifasta():
     max_age = 0
     
     for sample in fastas_content:
-        try:
-            raw_header = sample[0]
-            header = raw_header.replace('>', '')
-            header = header.split('_')
-            id = header[0]
-            age = header[-1]
+        raw_header = sample[0]
+        header = raw_header.replace('>', '')
+        header = header.split(' ')
+        id = header[0]
+        age = header[1]
 
-            if not is_number(age):
-                msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
-                printWarningMessage()
-                continue
+        if not is_number(age):
+            msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
+            printWarningMessage(msg)
+            continue
+        
+        age = float(age)
+
+        if age > max_age:
+            max_age = age
             
-            age = float(age)
+        seq = sample[1].replace('\n', '')
 
-            if age > max_age:
-                max_age = age
-                
-            seq = sample[1].replace('\n', '')
+        if id in samples:
+            msg = 'Repeated sample with id ' + id
+            printWarningMessage(msg)
 
-            if id in samples:
-                msg = 'Repeated sample with id ' + id
-                printWarningMessage()
-
-            samples[id] = [id, age, seq]
-        except:
-            msg = 'Could not process sample with id ' + id
-            printErrorMessage(msg)
+        samples[id] = [id, age, seq]
             
     N_SLICES = int(max_age/window)
     
@@ -469,7 +465,7 @@ def merge_data():
 
             df_set = df_set._append({'id': id, 'age': age, 'falcon_estimated_age': falcon_estimated_age, 'relative_size': relative_size, 'cg_content': cg_content, 'n_content': n_content}, ignore_index=True)
         
-        df_set_path = os.path.join(context_path, samples_sets_names[idx] + '_data.csv')
+        df_set_path = os.path.join(context_path, samples_sets_names[idx] + 'set_features.csv')
         idx += 1
         df_set.to_csv(df_set_path, index=False)
 
@@ -479,19 +475,20 @@ def extract_features():
     integrate_falcon_data()
     get_falcon_predictions()
     get_quantitative_data()
-
     merge_data()
 
 
 def plot_binary_auroc_auprc(auroc_arr, auprc_arr):
     figure, axis = plt.subplots(1, 1)  # Adjust figure size if needed
-
+    
+    plt.ylim(0, 1)
+    
     axis.plot(range(1, N_SLICES), auroc_arr, color='blue', label='AUROC')
-    axis.plot(range(1, N_SLICES), auprc_arr, color='red', label='AUPRC')
+    axis.plot(range(1, N_SLICES), auprc_arr, color='red', linestyle='dotted', label='AUPRC')
 
     axis.set_xlabel('Generations Ago Threshold Cut')  # Add labels to the axis
     axis.set_ylabel('Score')
-    axis.legend(loc='lower right')
+    axis.legend(loc='lower left')
 
     # Adjusts subplot params so that subplots fit in to the figure area.
     plt.tight_layout()
@@ -501,12 +498,14 @@ def plot_binary_auroc_auprc(auroc_arr, auprc_arr):
 
 def plot_binary_hist_dist(samples_per_century_array):
     figure, axis = plt.subplots(1, 1)
+    
+    plt.ylim(0, 1)
 
     keys = list(samples_per_century_array.keys())
     values = list(samples_per_century_array.values())
 
     axis.bar(keys, values, alpha=0.5)
-
+    
     axis.set_xlabel('Generations Ago')
     axis.set_ylabel('Normalized Percentage of Samples %')
 
@@ -516,6 +515,9 @@ def plot_binary_hist_dist(samples_per_century_array):
 
 def plot_binary_perf(acc, precision, recall, f1, y_true_random, y_pred_random, false_predictions, random_array):
     figure, axis = plt.subplots(1, 1)
+    
+    plt.ylim(0, 1)
+    
 
     axis.plot(range(1, N_SLICES), acc, color='blue', label='Accuracy')
     axis.plot(range(1, N_SLICES), false_predictions,
@@ -741,7 +743,6 @@ def test(threshold, model_name):
     X_test = df_test[['falcon_estimated_age', 'cg_content', 'relative_size', 'n_content']]
     # X_test = df_test[['falcon_estimated_age']]
     y_test = df_test['age']
-
     # Save the trained model
     model_file_name = os.path.join(
         context_path, 'models/model_' + model_name + '.joblib')
@@ -948,6 +949,7 @@ def main():
         read_multifasta()
         divide_set()
         extract_features()
+        load_features()
         train_authenticator(model_name)
 
     elif args.phase == 'feature_extraction':
