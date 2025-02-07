@@ -6,6 +6,12 @@ import pandas as pd
 import os
 import random
 import logging
+import colorlog
+import authpipe.configuration.configuration as config
+from argparse import ArgumentParser, Namespace
+from authpipe.plot_utilities.plot_utilities import plot_binary_perf, plot_binary_auroc_auprc, plot_binary_hist_dist
+from authpipe.data_processing_utilities.data_processing_utilities import read_multifasta, divide_set, load_sets, get_falcon_scores, integrate_falcon_data, get_falcon_predictions, get_quantitative_data, merge_data, extract_features, load_features
+from authpipe.logging_utilities.logging_utilities import setup_log
 from math import floor
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVR
@@ -18,33 +24,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from xgboost import XGBRegressor
 from colorama import Fore, Back, Style
-from argparse import ArgumentParser, Namespace
-from authpipe.plot_utilities import plot, plot_binary_perf, plot_binary_auroc_auprc, plot_binary_hist_dist
-from authpipe.data_processing_utilities import read_multifasta, divide_set, load_sets, get_falcon_scores, integrate_falcon_data, get_falcon_predictions, get_quantitative_data, merge_data, extract_features, load_features
-
-this_file_path = os.path.dirname(os.path.abspath(__file__))
-
-lbound = None
-rbound = None
-
-context_path = None
-
-df_train = None
-df_val = None
-df_test = None
-
-verbose = False
-
-samples = {}
-samples_train = {}
-samples_test = {}
-samples_val = {}
-
-window = None
 
 def train(threshold, model_name):
-    global df_train, verbose, context_path
-
+    df_train = config.settings.df_train
+    context_path = config.settings.context_path
+    
     # Separate features (X) and target (y)
     X_train = df_train[['falcon_estimated_age', 'cg_content', 'relative_size', 'n_content']]
     # X_train = df_train[['falcon_estimated_age']]
@@ -93,7 +77,9 @@ def train(threshold, model_name):
 
 
 def test(threshold, model_name):
-    global df_test, verbose, context_path
+    df_test = config.settings.df_test
+    df_train = config.settings.df_train
+    context_path = config.settings.context_path
 
     # Separate features (X) and target (y)
     X_test = df_test[['falcon_estimated_age', 'cg_content', 'relative_size', 'n_content']]
@@ -132,7 +118,13 @@ def test(threshold, model_name):
 
 
 def build_authenticator(model_name):
-    global window, N_INTERVALS, rbound, lbound
+    n_intervals = config.settings.n_intervals
+    window = config.settings.window
+    rbound = config.settings.rbound
+    lbound = config.settings.lbound
+    plot_mode = config.settings.plot_mode
+    verbose = config.settings.verbose
+    n_intervals_x = config.settings.n_intervals
     
     auroc_array = []
     auprc_array = []
@@ -153,13 +145,13 @@ def build_authenticator(model_name):
     max_lim = int(rbound/window)
     min_lim = int(lbound/window)
     
-    N_INTERVALS = max_lim - min_lim + 1
+    n_intervals = max_lim - min_lim + 1
 
-    samples_per_century_array = {i: 0 for i in range(0, N_INTERVALS)}
-        
+    samples_per_century_array = {i: 0 for i in range(0, n_intervals)}
+    
     for threshold in range(min_lim, max_lim):
-        if not verbose:
-            logging.info(f'\r{threshold}/{N_INTERVALS - 1}')
+        if verbose:
+            logging.verbose(f'Threshold cut: {threshold}/{n_intervals - 1}')
 
         train(threshold=window*threshold, model_name=model_name)
         acc, precision, recall, f1, y_true, y_pred, cm, y_true_categories, auroc, auprc = test(
@@ -197,7 +189,7 @@ def build_authenticator(model_name):
         y_true_categories_unique = list(set(y_true_categories))
 
         samples_per_century = {i: y_true_categories.count(
-            i) for i in y_true_categories_unique if i < N_INTERVALS}
+            i) for i in y_true_categories_unique if i < n_intervals}
 
         for key in samples_per_century.keys():
             samples_per_century_array[key] += samples_per_century[key]
@@ -206,6 +198,10 @@ def build_authenticator(model_name):
     for key in samples_per_century_array.keys():
         total_samples += samples_per_century_array[key]
 
+    if total_samples == 0:
+        logging.error(f'Zero samples found! Exiting...')
+        exit()
+        
     for key in samples_per_century_array.keys():
         samples_per_century_array[key] = samples_per_century_array[key]/total_samples
 
@@ -214,23 +210,18 @@ def build_authenticator(model_name):
     false_predictions = [C01_array[i] + C10_array[i]
                             for i in range(len(C01_array))]
 
-    plot_binary_perf(acc_array, precision_array, recall_array, f1_weighted_array,
-                        honest_coin_random_array, y_pred_ancient_array, false_predictions, random_array)
-    plot_binary_auroc_auprc(auroc_array, auprc_array)
-    plot_binary_hist_dist(samples_per_century_array)
+    if plot_mode:
+        plot_binary_perf(acc_array, precision_array, recall_array, f1_weighted_array,
+                            honest_coin_random_array, y_pred_ancient_array, false_predictions, random_array, n_intervals_x)
+        plot_binary_auroc_auprc(auroc_array, auprc_array, n_intervals_x)
+        plot_binary_hist_dist(samples_per_century_array)
 
 
 def main():
-    global samples, verbose, context_path, window, rbound, lbound
-
-    logging.basicConfig(
-        filename='amtauth.log',  
-        level=logging.INFO,      
-        format='%(asctime)s - %(levelname)s - %(message)s'  
-    )
+    setup_log()
     
     parser = ArgumentParser()
-
+        
     parser.add_argument(
         '--phase',
         choices=['multifasta', 'feature_extraction', 'training', 'auth'],
@@ -290,21 +281,33 @@ def main():
     # Get arguments from command line
     args: Namespace = parser.parse_args()
 
+    plot_mode = args.plot
+    verbose = args.verbose
     rbound = float(args.rbound)
     lbound = float(args.lbound)
-    
     window = float(args.window)
-    
     context_path = args.context
+    model_name = args.model
     
+    n_intervals = None
+    if not (rbound is None) and not (lbound is None):
+        n_intervals = int((rbound - lbound) / window) + 1
+        
     subprocess.run(['mkdir', '-p', context_path + '/.tops/'])
     subprocess.run(['mkdir', '-p', context_path + '/models/'])
-            
-    model_name = args.model
+     
+    config.settings.context_path = context_path
+    config.settings.rbound = rbound
+    config.settings.lbound = lbound
+    config.settings.window = window
+    config.settings.execution_path = os.path.dirname(os.path.abspath(__file__))
+    config.settings.verbose = verbose
+    config.settings.plot_mode = plot_mode
+    config.settings.n_intervals = n_intervals
 
     next_phase = ''
     if args.phase == 'multifasta':
-        logging.info('Running multifasta phase...')
+        logging.info('On multifasta phase...')
         
         subprocess.run(['rm', context_path + '/.tops/*'])
         
@@ -315,14 +318,14 @@ def main():
         build_authenticator(model_name)
 
     elif args.phase == 'feature_extraction':
-        logging.info('Running feature_extraction phase...')
+        logging.info('On feature_extraction phase...')
 
         load_sets()
         extract_features()
         build_authenticator(model_name)
     
     elif args.phase == 'training':
-        logging.info('Running training phase...')
+        logging.info('On training phase...')
         
         load_features()
         build_authenticator(model_name)
@@ -336,10 +339,6 @@ def main():
     # if args.PCA:
     #     calculate_pca()
     #     return
-
-
-    if args.plot:
-        plot()
 
 
 if __name__ == '__main__':

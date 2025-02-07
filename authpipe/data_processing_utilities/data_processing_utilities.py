@@ -4,11 +4,17 @@ import random
 import os
 import subprocess
 import logging
-from authpipe.general_utilities import is_number
+import authpipe.configuration.configuration as config
+from authpipe.general_utilities.general_utilities import is_number
+
+samples_train = None 
+samples_test = None 
+samples_val = None
 
 def read_multifasta():
-    global samples, this_file_path, window, N_INTERVALS
-
+    context_path = config.settings.context_path
+    window = config.settings.window
+    
     multifasta_file_path = os.path.join(context_path, 'multifasta.fa')
     multifasta_file = open(multifasta_file_path, 'r')
     multifasta = multifasta_file.read()
@@ -20,6 +26,8 @@ def read_multifasta():
     fastas_content = pattern.findall(multifasta)
 
     max_age = 0
+    
+    samples = {} 
     
     for sample in fastas_content:
         raw_header = sample[0]
@@ -46,13 +54,20 @@ def read_multifasta():
 
         samples[id] = [id, age, seq]
             
-    N_INTERVALS = int(max_age/window)
+    config.settings.samples = samples
+    if config.settings.n_intervals is None:  
+        config.settings.n_intervals = int(max_age/window)
     
     
 def divide_set():
-    global samples, samples_train, samples_test
+    samples = config.settings.samples
+    samples_train = config.settings.samples_train
+    samples_val = config.settings.samples_val
+    samples_test = config.settings.samples_test
+    context_path = config.settings.context_path
 
     train_file_path = os.path.join(context_path, 'train_multifasta.fa')
+    val_file_path = os.path.join(context_path, 'val_multifasta.fa')
     test_file_path = os.path.join(context_path, 'test_multifasta.fa')
 
     # Convert map to list
@@ -65,17 +80,33 @@ def divide_set():
     train_proportion = 0.7
     samples_train = samples_list[0:int(samples_size*train_proportion)]
     #
-    samples_test = samples_list[int(
-        samples_size*train_proportion):]
+    val_proportion = 0.2
+    samples_val = samples_list[int(samples_size*train_proportion):int(samples_size*(train_proportion+val_proportion))]
+    #
+    samples_test = samples_list[int(samples_size*(train_proportion+val_proportion)):]
 
     # Convert back to map
     samples = dict(samples_list)
     samples_train = dict(samples_train)
+    samples_val = dict(samples_val)
     samples_test = dict(samples_test)
 
     with open(train_file_path, 'w') as file:
         for key in samples_train.keys():
             sample = samples_train[key]
+            id = sample[0]
+            age = sample[1]
+            header = '>' + id + ' ' + str(age)
+            seq = sample[2].replace('\n', '')
+
+            file.write(header)
+            file.write('\n')
+            file.write(seq)
+            file.write('\n')
+            
+    with open(val_file_path, 'w') as file:
+        for key in samples_val.keys():
+            sample = samples_val[key]
             id = sample[0]
             age = sample[1]
             header = '>' + id + ' ' + str(age)
@@ -98,12 +129,21 @@ def divide_set():
             file.write('\n')
             file.write(seq)
             file.write('\n')
+            
+    config.settings.samples_train = samples_train
+    config.settings.samples_val = samples_val
+    config.settings.samples_test = samples_test
 
 
 def load_sets():
-    global samples, samples_train, samples_test, samples_val
+    context_path = config.settings.context_path
+    samples = config.settings.samples
+    samples_train = config.settings.samples_train
+    samples_val = config.settings.samples_val
+    samples_test = config.settings.samples_test
 
     train_file_path = os.path.join(context_path, 'train_multifasta.fa')
+    val_file_path = os.path.join(context_path, 'val_multifasta.fa')
     test_file_path = os.path.join(context_path, 'test_multifasta.fa')
 
     max_age = 0
@@ -141,6 +181,44 @@ def load_sets():
                         logging.warning(msg)
 
                     samples_train[id] = [id, age, seq]
+    else:
+        msg = 'Could not find Train FASTA files to load.'
+        logging.error(msg)
+        exit()
+        
+    if os.path.exists(val_file_path):
+        with open(val_file_path, 'r') as file:
+            pattern = re.compile(r'>(.*?)\n([\s\S]*?)(?=\n>|\Z)', re.DOTALL)
+
+            val_multifasta = file.read()
+            val_multifasta = val_multifasta.upper()
+            fastas_content = pattern.findall(val_multifasta)
+            
+            for sample in fastas_content:
+                    raw_header = sample[0]
+                    
+                    header = raw_header.replace('>', '')
+                    header = header.split('_')
+                    id = header[0]
+                    age = header[-1]
+                    
+                    if not is_number(age):
+                        msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
+                        logging.warning(msg)
+                        continue
+                    
+                    age = float(age)
+
+                    if age > max_age:
+                        max_age = age
+                        
+                    seq = sample[1].replace('\n', '')
+
+                    if id in samples:
+                        msg = 'Repeated sample with id ' + id
+                        logging.warning(msg)
+
+                    samples_val[id] = [id, age, seq]
     else:
         msg = 'Could not find Train FASTA files to load.'
         logging.error(msg)
@@ -188,8 +266,15 @@ def load_sets():
 
 
 def get_falcon_scores():
-    global samples, samples_train, samples_test, samples_val, context_path
-
+    context_path = config.settings.context_path
+    samples = config.settings.samples
+    samples_train = config.settings.samples_train
+    samples_val = config.settings.samples_val
+    samples_test = config.settings.samples_test
+    
+    context_path = config.settings.context_path
+    verbose = config.settings.verbose
+    
     train_multifasta_file_name = os.path.join(context_path, 'train_multifasta.fa')
     
     # Run on Falcon
@@ -210,17 +295,23 @@ def get_falcon_scores():
 
         top_file_name = os.path.join(context_path, '.tops/' + id + '_' + str(age) + '_top.txt') 
 
-        message = str(count) + '/' + str(samples_len)
-        logging.info(message)
+        msg = '[FALCON] ' + str(count) + '/' + str(samples_len)
+        if verbose:
+            logging.verbose(msg)
         count += 1
-
-        # ./FALCON -m 6:1:0:0/0 -m 11:10:0:0/0 -m 13:200:1:3/1  -g 0.85 -v -F -t 50 -n 6 -x top_n1.txt FASTA_SAMPLE MTDB
-        subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-v', '-F', '-t', '50', '-n', '12', '-x', top_file_name, temp_fasta_file_name, train_multifasta_file_name])
+        
+        with open(os.devnull, 'w') as devnull:
+            # ./FALCON -m 6:1:0:0/0 -m 11:10:0:0/0 -m 13:200:1:3/1  -g 0.85 -v -F -t 50 -n 6 -x top_n1.txt FASTA_SAMPLE MTDB
+            subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_name, temp_fasta_file_name, train_multifasta_file_name], stdout=devnull, stderr=devnull)
+    
+            # subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_name, temp_fasta_file_name, train_multifasta_file_name])
 
         temp_fasta_file.close()
 
 
 def integrate_falcon_data():
+    context_path = config.settings.context_path
+    
     df = pd.DataFrame(columns=['set', 'id', 'age', 'top'])
 
     folder_path = os.path.join(context_path,'.tops/')
@@ -247,6 +338,8 @@ def integrate_falcon_data():
 
 
 def get_falcon_predictions():
+    context_path = config.settings.context_path
+    
     input_file_name = os.path.join(context_path, 'falcon_integrated_data.csv')
     df = pd.read_csv(input_file_name)
     
@@ -307,6 +400,9 @@ def get_falcon_predictions():
 
 
 def get_quantitative_data():
+    samples = config.settings.samples
+    context_path = config.settings.context_path
+    
     seq_base_size = 17000
     sample_array = []
 
@@ -351,6 +447,11 @@ def get_quantitative_data():
 
 
 def merge_data():
+    context_path = config.settings.context_path
+    samples_train = config.settings.samples_train
+    samples_val = config.settings.samples_val
+    samples_test = config.settings.samples_test
+    
     falcon_features_path = os.path.join(context_path, 'falcon_predictions.csv')
     df_falcon_features = pd.read_csv(falcon_features_path)
     q_features_path = os.path.join(context_path, 'quantitative_data.csv')
@@ -407,8 +508,10 @@ def extract_features():
 
 
 def load_features():
-    global df_train, df_val, df_test, N_INTERVALS, window
-
+    window = config.settings.window
+    
+    context_path = config.settings.context_path
+    
     df_train_path = os.path.join(context_path, 'trainset_features.csv')
     df_train = pd.read_csv(df_train_path)
 
@@ -421,5 +524,10 @@ def load_features():
     max_age = max(df_train['age'].max(), df_test['age'].max())
     max_age = max(max_age, df_val['age'].max())
 
-    N_INTERVALS = int(max_age/window)
+    if config.settings.n_intervals is None:  
+        config.settings.n_intervals = int(max_age/window)
+    
+    config.settings.df_train = df_train
+    config.settings.df_val = df_val
+    config.settings.df_test = df_test
 
