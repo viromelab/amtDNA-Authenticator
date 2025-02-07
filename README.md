@@ -26,6 +26,55 @@ This repository contains code for a feature based machine learning tool for auth
 * FALCON (needs to be installed separately)
 * colorama
 
+## Installation steps
+
+You will need python3 installed beforee proceeding!
+
+1. **Create a virtual environment (venv):**
+
+```
+$ sudo apt-get install python3-venv # Install venv if not previously installed
+$ cd PATH_TO_YOUR_PROJECT
+$ python3 -m venv .venv # It created your venv in the hidden directory .venv (Use ls -la to see it)
+$ source .venv/bin/activate # Activate venv
+```
+
+Now you have a venv configured to work in without messing with your global python installation.
+
+To check if it is correctly working, you can run:
+
+```
+$ which python3
+```
+
+And it should return PATH_TO_YOUR_PROJECT/.venv/bin/python3
+
+```
+$ which pip
+```
+
+Should return PATH_TO_YOUR_PROJECT/.venv/bin/pip
+
+
+2. **Install the required dependencies on your venv with pip:**
+
+```
+$ pip install -r requirements.txt
+```
+
+2. **Install FALCON from the repository:**
+
+You might need to first configure your github account with the correct public key permissions. For that, follow this link https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent.
+
+After setting up your permissions, proceede to install FALCON from this link:
+
+https://github.com/cobilab/falcon
+
+
+## Example
+
+To run an example
+
 
 ## Usage
 
@@ -34,7 +83,7 @@ This repository contains code for a feature based machine learning tool for auth
     * Place the `multifasta.fa` file in a directory. This will be your `context` directory.
 2. **Run the pipeline:**
     ```bash
-    python main.py --phase multifasta --model XGB --window 100 --rbound 10000 --lbound 0 --context /path/to/your/context/directory
+    authpipe --phase multifasta --model XGB --window 100 --rbound 10000 --lbound 0 --context /path/to/your/context/directory
     ```
     * Replace `/path/to/your/context/directory` with the actual path.
     * You can change the `--model` argument to use a different machine learning model.
