@@ -1,38 +1,32 @@
 import re
-from argparse import ArgumentParser, Namespace
+import numpy as np
+import joblib
 import subprocess
+import pandas as pd
+import os
+import random
+import logging
+from math import floor
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVR
-from sklearn.metrics import mean_squared_error, r2_score
-import joblib
-from xgboost import XGBRegressor
-import pandas as pd
-from math import floor
-import os
-import matplotlib.pyplot as plt
 from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVR
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, confusion_matrix
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, confusion_matrix, roc_auc_score, average_precision_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-import numpy as np
-import random
-from sklearn.metrics import roc_auc_score, average_precision_score
+from xgboost import XGBRegressor
 from colorama import Fore, Back, Style
+from argparse import ArgumentParser, Namespace
+from authpipe.plot_utilities import plot, plot_binary_perf, plot_binary_auroc_auprc, plot_binary_hist_dist
+from authpipe.data_processing_utilities import read_multifasta, divide_set, load_sets, get_falcon_scores, integrate_falcon_data, get_falcon_predictions, get_quantitative_data, merge_data, extract_features, load_features
 
-LABEL_SIZE = 16
-N_SLICES = 60
+this_file_path = os.path.dirname(os.path.abspath(__file__))
 
 lbound = None
 rbound = None
 
-# Set the font size for tick labels
-plt.rcParams['xtick.labelsize'] = LABEL_SIZE  # For x-axis tick labels
-plt.rcParams['ytick.labelsize'] = LABEL_SIZE  # For y-axis tick labels
-
-this_file_path = os.path.dirname(os.path.abspath(__file__))
 context_path = None
 
 df_train = None
@@ -47,644 +41,6 @@ samples_test = {}
 samples_val = {}
 
 window = None
-
-def printWarningMessage(message):
-    print(Fore.YELLOW + Style.BRIGHT + '[WARNING]', end=' ')
-    print(message)
-    print(Style.RESET_ALL)
-    
-
-def printErrorMessage(message):
-    print(Fore.RED + Style.BRIGHT + '[ERROR]', end=' ')
-    print(message)
-    print(Style.RESET_ALL)
-
-
-def printRunningMessage(message):
-    print(Fore.BLUE + Style.BRIGHT + '> ', message)
-    print(Style.RESET_ALL)
-
-
-def sep_line():
-    print('=' * 50)
-
-
-def is_number(s):
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
-
-# Load data from multifasta
-
-
-def read_multifasta():
-    global samples, this_file_path, N_SLICES, window
-
-    multifasta_file_path = os.path.join(context_path, 'multifasta.fa')
-    multifasta_file = open(multifasta_file_path, 'r')
-    multifasta = multifasta_file.read()
-    multifasta = multifasta.upper()
-    multifasta_file.close()
-
-    pattern = re.compile(r'>(.*?)\n([\s\S]*?)(?=\n>|\Z)', re.DOTALL)
-
-    fastas_content = pattern.findall(multifasta)
-
-    max_age = 0
-    
-    for sample in fastas_content:
-        raw_header = sample[0]
-        header = raw_header.replace('>', '')
-        header = header.split(' ')
-        id = header[0]
-        age = header[1]
-
-        if not is_number(age):
-            msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
-            printWarningMessage(msg)
-            continue
-        
-        age = float(age)
-
-        if age > max_age:
-            max_age = age
-            
-        seq = sample[1].replace('\n', '')
-
-        if id in samples:
-            msg = 'Repeated sample with id ' + id
-            printWarningMessage(msg)
-
-        samples[id] = [id, age, seq]
-            
-    N_SLICES = int(max_age/window)
-    
-def divide_set():
-    global samples, samples_train, samples_test
-
-    train_file_path = os.path.join(context_path, 'train_multifasta.fa')
-    test_file_path = os.path.join(context_path, 'test_multifasta.fa')
-
-    # Convert map to list
-    samples_list = list(samples.items())
-    # Shuffle list
-    random.shuffle(samples_list)
-    #
-    samples_size = len(samples)
-    #
-    train_proportion = 0.7
-    samples_train = samples_list[0:int(samples_size*train_proportion)]
-    #
-    samples_test = samples_list[int(
-        samples_size*train_proportion):]
-
-    # Convert back to map
-    samples = dict(samples_list)
-    samples_train = dict(samples_train)
-    samples_test = dict(samples_test)
-
-    with open(train_file_path, 'w') as file:
-        for key in samples_train.keys():
-            sample = samples_train[key]
-            id = sample[0]
-            age = sample[1]
-            header = '>' + id + ' ' + str(age)
-            seq = sample[2].replace('\n', '')
-
-            file.write(header)
-            file.write('\n')
-            file.write(seq)
-            file.write('\n')
-            
-    with open(test_file_path, 'w') as file:
-        for key in samples_test.keys():
-            sample = samples_test[key]
-            id = sample[0]
-            age = sample[1]
-            header = '>' + id + ' ' + str(age)
-            seq = sample[2].replace('\n', '')
-
-            file.write(header)
-            file.write('\n')
-            file.write(seq)
-            file.write('\n')
-
-
-def load_sets():
-    global samples, samples_train, samples_test, samples_val
-
-    train_file_path = os.path.join(context_path, 'train_multifasta.fa')
-    test_file_path = os.path.join(context_path, 'test_multifasta.fa')
-
-    max_age = 0
-
-    if os.path.exists(train_file_path):
-        with open(train_file_path, 'r') as file:
-            pattern = re.compile(r'>(.*?)\n([\s\S]*?)(?=\n>|\Z)', re.DOTALL)
-
-            train_multifasta = file.read()
-            train_multifasta = train_multifasta.upper()
-            fastas_content = pattern.findall(train_multifasta)
-            
-            for sample in fastas_content:
-                    raw_header = sample[0]
-                    
-                    header = raw_header.replace('>', '')
-                    header = header.split('_')
-                    id = header[0]
-                    age = header[-1]
-                    
-                    if not is_number(age):
-                        msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
-                        printWarningMessage(msg)
-                        continue
-                    
-                    age = float(age)
-
-                    if age > max_age:
-                        max_age = age
-                        
-                    seq = sample[1].replace('\n', '')
-
-                    if id in samples:
-                        msg = 'Repeated sample with id ' + id
-                        printWarningMessage(msg)
-
-                    samples_train[id] = [id, age, seq]
-    else:
-        msg = 'Could not find Train FASTA files to load.'
-        printErrorMessage(msg)
-        exit()
-        
-    if os.path.exists(test_file_path):
-        with open(test_file_path, 'r') as file:
-            pattern = re.compile(r'>(.*?)\n([\s\S]*?)(?=\n>|\Z)', re.DOTALL)
-
-            test_multifasta = file.read()
-            test_multifasta = test_multifasta.upper()
-            fastas_content = pattern.findall(test_multifasta)
-            
-            for sample in fastas_content:
-                raw_header = sample[0]
-                header = raw_header.replace('>', '')
-                header = header.split(' ')
-                id = header[0]
-                age = header[-1]
-
-                if not is_number(age):
-                    msg = 'Could not process age from sample with id ' + id + '. Found age: ' + age
-                    printWarningMessage(msg)
-                    continue
-                
-                age = float(age)
-
-                if age > max_age:
-                    max_age = age
-                    
-                seq = sample[1]
-
-                if id in samples:
-                    msg = 'Repeated sample with id ' + id
-                    printWarningMessage(msg)
-
-                samples_test[id] = [id, age, seq]
-
-    else:
-        msg = 'Could not find Test FASTA files to load.'
-        printErrorMessage(msg)
-        exit()
-        
-    samples = {**samples_train, **samples_test}
-
-
-## Calculate FALCON scores
-def get_falcon_scores():
-    global samples, samples_train, samples_test, samples_val, context_path
-
-    train_multifasta_file_name = os.path.join(context_path, 'train_multifasta.fa')
-    
-    # Run on Falcon
-    count = 1
-    samples_len = len(samples.keys())
-    for key in samples.keys():
-        sample = samples[key]
-        id = sample[0]
-        age = sample[1]
-        header = '>' + id  + ' ' + str(age)
-        seq = sample[2]
-
-        temp_fasta_file_name = os.path.join(context_path, 'temp_fasta.fa')
-        temp_fasta_file = open(temp_fasta_file_name, 'w')
-        temp_fasta_file.write(header)
-        temp_fasta_file.write('\n')
-        temp_fasta_file.write(seq)
-
-        top_file_name = os.path.join(context_path, '.tops/' + id + '_' + str(age) + '_top.txt') 
-
-        message = str(count) + '/' + str(samples_len)
-        printRunningMessage(message)
-        count += 1
-
-        # ./FALCON -m 6:1:0:0/0 -m 11:10:0:0/0 -m 13:200:1:3/1  -g 0.85 -v -F -t 50 -n 6 -x top_n1.txt FASTA_SAMPLE MTDB
-        subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-v', '-F', '-t', '50', '-n', '12', '-x', top_file_name, temp_fasta_file_name, train_multifasta_file_name])
-
-        temp_fasta_file.close()
-
-
-def integrate_falcon_data():
-    df = pd.DataFrame(columns=['set', 'id', 'age', 'top'])
-
-    folder_path = os.path.join(context_path,'.tops/')
-
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        if os.path.isfile(file_path):
-            header = filename.split('_')
-            id = header[0]
-            age = header[-2]
-
-            top_path = os.path.join(folder_path, filename)
-            file = open(top_path, '+r')
-            
-            top_lines = file.readlines()
-            top_list = [item.replace('\n', '').split('\t') for item in top_lines]
-            top_list = [[item[0], item[1], item[2], item[3].split('_')] for item in top_list]
-            top_list = [[int(item[0]), int(item[1]), float(item[2]), item[3][0], float(item[3][-1])] for item in top_list]
-
-            df = df._append({'id': id, 'age': age, 'top': top_list}, ignore_index=True)
-
-    output_file_name = os.path.join(context_path, 'falcon_integrated_data.csv')
-    df.to_csv(output_file_name)
-
-
-def get_falcon_predictions():
-    input_file_name = os.path.join(context_path, 'falcon_integrated_data.csv')
-    df = pd.read_csv(input_file_name)
-    
-    df['top'] = df['top'].apply(eval)
-
-    results = []
-
-    set_age_df = pd.DataFrame(results, columns=['id', 'age', 'avg_age'])
-
-    for iter, row in df.iterrows():
-        top_list = row['top']
-        id = row['id']
-        age = row['age']
-        
-        norm_val = sum([item[2] for item in top_list if item[3] != id])
-
-        if norm_val == 0:
-            print('[Zero norm val] Id:', id)
-            continue
-
-        avg_age = sum([item[2]*item[4] for item in top_list if item[3] != id])
-
-        avg_age /= norm_val
-
-        results.append([id, age, avg_age])
-
-    temp_df = pd.DataFrame(results, columns=['id', 'age','avg_age'])
-    set_age_df = pd.concat([set_age_df, temp_df], ignore_index=True)
-
-    #######################################################################################
-
-    falcon_features = []
-
-    for id in set_age_df['id']:
-        temp_df = set_age_df[set_age_df['id'] == id]
-        
-        # if id in visited_id:
-        #     continue
-        # visited_id[id] = True
-
-        avg_age = 0
-        count = 0
-        for iter, row in temp_df.iterrows():
-            avg_age += row['avg_age']
-            count += 1
-
-        if count != 1:
-            avg_age /= count
-
-        falcon_features.append([id, age, avg_age])
-
-    falcon_features_df = pd.DataFrame(falcon_features, columns=['id', 'age', 'avg_age'])
-    
-    # Save dataframe
-    output_file_name = os.path.join(context_path, 'falcon_predictions.csv')
-    falcon_features_df.to_csv(output_file_name, index=False)
-
-
-def get_quantitative_data():
-    seq_base_size = 17000
-    sample_array = []
-
-    for id in samples:  
-        item = samples[id]
-
-        id = item[0]
-
-        id = id.split('_')[0]
-
-        age = item[1]
-
-        seq = item[2]
-        seq = seq.replace('\n', '')
-        
-        # Capitalize all chars in string
-        seq = seq.upper()
-
-        seq_len = len(seq)
-
-        # Extract relative size
-        relative_size = seq_len / seq_base_size
-        # Extract CG content
-        cg_content = (seq.count('C') + seq.count('G')) / seq_len
-        # Extract N content
-        n_content = seq.count('N') / seq_len
-
-        sample_array.append((id, age, relative_size, cg_content, n_content))
-        
-    sample_array.sort(key=lambda item: item[0])
-
-    id_array = [i[0] for i in sample_array]
-    age_array = [i[1] for i in sample_array]
-    relative_size_array = [i[2] for i in sample_array]
-    cg_content_array = [i[3] for i in sample_array]
-    n_content_array = [i[4] for i in sample_array]
-
-    # save modern data to csv file
-    df = pd.DataFrame({'id': id_array, 'real_age': age_array, 'relative_size': relative_size_array, 'cg_content': cg_content_array, 'n_content': n_content_array})
-    output_file_name = os.path.join(context_path, 'quantitative_data.csv')
-    df.to_csv(output_file_name, index=False)
-
-
-def merge_data():
-    falcon_features_path = os.path.join(context_path, 'falcon_predictions.csv')
-    df_falcon_features = pd.read_csv(falcon_features_path)
-    q_features_path = os.path.join(context_path, 'quantitative_data.csv')
-    df_q_features = pd.read_csv(q_features_path)
-
-    samples_sets = [samples_train, samples_val, samples_test]
-    samples_sets_names = ['train', 'val', 'test']
-
-    idx = 0
-    for sample_set in samples_sets:
-        df_set = pd.DataFrame(columns=['id', 'age', 'falcon_estimated_age', 'relative_size', 'cg_content', 'n_content'])
-        for id in sample_set:
-            age = sample_set[id][1]
-
-            id = id.split('_')[0]
-
-            falcon_features = df_falcon_features[df_falcon_features['id']==id]
-
-            try:
-                falcon_estimated_age = falcon_features['avg_age'].values[0]
-            except:
-                falcon_estimated_age = falcon_features['avg_age']
-
-            q_features = df_q_features[df_q_features['id']==id]
-
-            try:
-                cg_content = q_features['cg_content'].values[0]
-            except:
-                cg_content = q_features['cg_content']
-
-            try:
-                relative_size = q_features['relative_size'].values[0]
-            except:
-                relative_size = q_features['relative_size']
-
-            try:
-                n_content = q_features['n_content'].values[0]
-            except:
-                n_content = q_features['n_content']
-
-            df_set = df_set._append({'id': id, 'age': age, 'falcon_estimated_age': falcon_estimated_age, 'relative_size': relative_size, 'cg_content': cg_content, 'n_content': n_content}, ignore_index=True)
-        
-        df_set_path = os.path.join(context_path, samples_sets_names[idx] + 'set_features.csv')
-        idx += 1
-        df_set.to_csv(df_set_path, index=False)
-
-
-def extract_features():
-    get_falcon_scores()
-    integrate_falcon_data()
-    get_falcon_predictions()
-    get_quantitative_data()
-    merge_data()
-
-
-def plot_binary_auroc_auprc(auroc_arr, auprc_arr):
-    figure, axis = plt.subplots(1, 1)  # Adjust figure size if needed
-    
-    plt.ylim(0, 1)
-    
-    axis.plot(range(1, N_SLICES), auroc_arr, color='blue', label='AUROC')
-    axis.plot(range(1, N_SLICES), auprc_arr, color='red', linestyle='dotted', label='AUPRC')
-
-    axis.set_xlabel('Generations Ago Threshold Cut')  # Add labels to the axis
-    axis.set_ylabel('Score')
-    axis.legend(loc='lower left')
-
-    # Adjusts subplot params so that subplots fit in to the figure area.
-    plt.tight_layout()
-    plt.show()
-    plt.close()
-
-
-def plot_binary_hist_dist(samples_per_century_array):
-    figure, axis = plt.subplots(1, 1)
-    
-    plt.ylim(0, 1)
-
-    keys = list(samples_per_century_array.keys())
-    values = list(samples_per_century_array.values())
-
-    axis.bar(keys, values, alpha=0.5)
-    
-    axis.set_xlabel('Generations Ago')
-    axis.set_ylabel('Normalized Percentage of Samples %')
-
-    plt.show()
-    plt.close()
-
-
-def plot_binary_perf(acc, precision, recall, f1, y_true_random, y_pred_random, false_predictions, random_array):
-    figure, axis = plt.subplots(1, 1)
-    
-    plt.ylim(0, 1)
-    
-
-    axis.plot(range(1, N_SLICES), acc, color='blue', label='Accuracy')
-    axis.plot(range(1, N_SLICES), false_predictions,
-              color='red', alpha=0.5, label='False Predictions')
-    axis.plot(range(1, N_SLICES), random_array, color='green',
-              linestyle='dashed', alpha=0.5, label='Random')
-    axis.plot(range(1, N_SLICES), f1, color='black', label='F1 Score')
-
-    axis.legend(loc='center right')
-
-    axis.set_xlabel('Generations Ago Threshold Cut')
-    axis.set_ylabel('Normalized Value %')
-
-    plt.show()
-
-    plt.close()
-
-
-def plot():
-    global train_fastas
-
-    figure, axis = plt.subplots(1, 1, subplot_kw={'projection': '3d'})
-
-    sample_array_modern = []
-    sample_array_ancient = []
-    relative_size_array = []
-    cg_content_array = []
-    n_content_array = []
-    age_array = []
-    code_array = []
-
-    seq_base_size = 17000
-
-    cg_count = 0
-    total_count = 0
-    modern_count = 0
-    ancient_count = 0
-    rs_count = 0
-
-    min_len = 0
-    max_len = 0
-    min_id = ''
-    max_id = ''
-
-    cond = False
-
-    modern = False
-
-    for item in train_fastas:
-        header = item[0].replace('>', '')
-
-        header = header.split(' ')
-
-        id = header[0]
-        age = header[1]
-        code = header[2]
-
-        seq = item[1]
-        seq = seq.replace('\n', '')
-
-        seq_len = len(seq)
-
-        if 'Modern' in id:
-            modern = True
-
-        # if not modern:
-            # continue
-
-        total_count += 1
-
-        if cond == False:
-            min_len = seq_len
-            max_len = seq_len
-            min_id = id
-            max_id = id
-            cond = True
-
-        elif seq_len < min_len:
-            min_len = seq_len
-            min_id = id
-
-        elif seq_len > max_len:
-            max_len = seq_len
-            max_id = id
-
-        # Extract relative size
-        relative_size = seq_len / seq_base_size
-        # Extract CG content
-        cg_content = (seq.count('C') + seq.count('G')) / seq_len
-
-        if cg_content > 0.3 and cg_content < 0.5:
-            cg_count += 1
-
-        if relative_size < 0.9748 and relative_size > 0.9:
-            rs_count += 1
-
-        # Extract N content
-        n_content = seq.count('N') / seq_len
-
-        if modern:
-            modern_count += 1
-            sample_array_modern.append(
-                (id, code, age, relative_size, cg_content, n_content))
-        else:
-            ancient_count += 1
-            sample_array_ancient.append(
-                (id, code, age, relative_size, cg_content, n_content))
-
-        modern = False
-
-    for item in sample_array_ancient:
-        code = float(item[1])
-        age = float(item[2])
-
-        if abs(100*code - age) > 100:
-            print('Wrong code!')
-            exit()
-
-    for item in sample_array_modern:
-        code = float(item[1])
-        age = float(item[2])
-
-        if abs(100*code - age) > 100:
-            print('Wrong code!')
-            exit()
-
-    sample_array_modern.sort(key=lambda item: item[0])
-    sample_array_ancient.sort(key=lambda item: item[0])
-
-    id_array = [i[0] for i in sample_array_modern]
-    code_array = [i[1] for i in sample_array_modern]
-    age_array = [i[2] for i in sample_array_modern]
-    relative_size_array = [i[3] for i in sample_array_modern]
-    cg_content_array = [i[4] for i in sample_array_modern]
-    n_content_array = [i[5] for i in sample_array_modern]
-
-    axis.plot(code_array, cg_content_array, relative_size_array, color='blue')
-
-    id_array = [i[0] for i in sample_array_ancient]
-    code_array = [i[1] for i in sample_array_ancient]
-    age_array = [i[2] for i in sample_array_ancient]
-    relative_size_array = [i[3] for i in sample_array_ancient]
-    cg_content_array = [i[4] for i in sample_array_ancient]
-    n_content_array = [i[5] for i in sample_array_ancient]
-
-    axis.plot(code_array, cg_content_array, relative_size_array, color='red')
-
-    plt.show()
-
-
-def load_features():
-    global df_train, df_val, df_test, N_SLICES, window
-
-    df_train_path = os.path.join(context_path, 'trainset_features.csv')
-    df_train = pd.read_csv(df_train_path)
-
-    df_val_path = os.path.join(context_path, 'valset_features.csv')
-    df_val = pd.read_csv(df_val_path)
-
-    df_test_path = os.path.join(context_path, 'testset_features.csv')
-    df_test = pd.read_csv(df_test_path)
-    
-    max_age = max(df_train['age'].max(), df_test['age'].max())
-    max_age = max(max_age, df_val['age'].max())
-
-    N_SLICES = int(max_age/window)
-
 
 def train(threshold, model_name):
     global df_train, verbose, context_path
@@ -710,7 +66,7 @@ def train(threshold, model_name):
     elif model_name == 'GNB':
         model = GaussianNB()
     else:
-        print('Invalid model!')
+        logging.error('Invalid model! Run \'authpipe --help\' to check the models available!')
         exit()
 
     # Train model
@@ -775,8 +131,8 @@ def test(threshold, model_name):
     return acc, precision, recall, f1, y_test, y_pred, cm, y_test_categories, auroc, auprc
 
 
-def train_authenticator(model_name):
-    global window, N_SLICES, rbound, lbound
+def build_authenticator(model_name):
+    global window, N_INTERVALS, rbound, lbound
     
     auroc_array = []
     auprc_array = []
@@ -797,13 +153,13 @@ def train_authenticator(model_name):
     max_lim = int(rbound/window)
     min_lim = int(lbound/window)
     
-    N_SLICES = max_lim - min_lim + 1
+    N_INTERVALS = max_lim - min_lim + 1
 
-    samples_per_century_array = {i: 0 for i in range(0, N_SLICES)}
-    
+    samples_per_century_array = {i: 0 for i in range(0, N_INTERVALS)}
+        
     for threshold in range(min_lim, max_lim):
         if not verbose:
-            print(f'\r{threshold}/{N_SLICES - 1}')
+            logging.info(f'\r{threshold}/{N_INTERVALS - 1}')
 
         train(threshold=window*threshold, model_name=model_name)
         acc, precision, recall, f1, y_true, y_pred, cm, y_true_categories, auroc, auprc = test(
@@ -841,7 +197,7 @@ def train_authenticator(model_name):
         y_true_categories_unique = list(set(y_true_categories))
 
         samples_per_century = {i: y_true_categories.count(
-            i) for i in y_true_categories_unique if i < N_SLICES}
+            i) for i in y_true_categories_unique if i < N_INTERVALS}
 
         for key in samples_per_century.keys():
             samples_per_century_array[key] += samples_per_century[key]
@@ -867,12 +223,14 @@ def train_authenticator(model_name):
 def main():
     global samples, verbose, context_path, window, rbound, lbound
 
+    logging.basicConfig(
+        filename='amtauth.log',  
+        level=logging.INFO,      
+        format='%(asctime)s - %(levelname)s - %(message)s'  
+    )
+    
     parser = ArgumentParser()
 
-    # Set input args
-    # parser.add_argument('--seq2', help='Input aDNA file 2 [Optional]', default=None)
-
-    #
     parser.add_argument(
         '--phase',
         choices=['multifasta', 'feature_extraction', 'training', 'auth'],
@@ -923,7 +281,7 @@ def main():
     # Set tools from command line
     parser.add_argument('--PCA', action='store_true', help='Calculate PCA')
     parser.add_argument('--plot', action='store_true', help='Plot data')
-    parser.add_argument('--verbose', action='store_true', help='Print data')
+    parser.add_argument('--verbose', action='store_true', help='Verbose mode')
 
     # Set output destionation from command line
     parser.add_argument(
@@ -946,20 +304,28 @@ def main():
 
     next_phase = ''
     if args.phase == 'multifasta':
+        logging.info('Running multifasta phase...')
+        
+        subprocess.run(['rm', context_path + '/.tops/*'])
+        
         read_multifasta()
         divide_set()
         extract_features()
         load_features()
-        train_authenticator(model_name)
+        build_authenticator(model_name)
 
     elif args.phase == 'feature_extraction':
+        logging.info('Running feature_extraction phase...')
+
         load_sets()
         extract_features()
-        train_authenticator(model_name)
+        build_authenticator(model_name)
     
     elif args.phase == 'training':
+        logging.info('Running training phase...')
+        
         load_features()
-        train_authenticator(model_name)
+        build_authenticator(model_name)
         
     elif args.phase == 'auth':
         pass
