@@ -1,7 +1,7 @@
 import os
 import subprocess
-import authpipe.configuration.configuration as config
-from authpipe.data_processing_utilities.data_processing_utilities import load_sets, extract_features
+import authpipe.core.configuration as config
+from authpipe.core.data_processing import load_sets, extract_features
 
 def run_extract_features(context_path, verbose, debug, falcon_verbose):
   

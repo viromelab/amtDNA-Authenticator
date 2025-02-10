@@ -4,8 +4,8 @@ import os
 import random
 import logging
 import click
-import authpipe.configuration.configuration as config
-from authpipe.logging_utilities.logging_utilities import setup_log
+import authpipe.core.configuration as config
+from authpipe.core.logging import setup_log
 from authpipe.process_multifasta.process_multifasta import run_process_multifasta
 from authpipe.extract_features.extract_features import run_extract_features
 from authpipe.training.training import run_train

@@ -1,4 +1,4 @@
-import authpipe.configuration.configuration as config
+import authpipe.core.configuration as config
 import matplotlib.pyplot as plt
 import logging
 

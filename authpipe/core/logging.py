@@ -1,6 +1,6 @@
 import logging
 import colorlog
-import authpipe.configuration.configuration as config
+import authpipe.core.configuration as config
 
 VERBOSE = 15
 logging.addLevelName(VERBOSE, "VERBOSE")

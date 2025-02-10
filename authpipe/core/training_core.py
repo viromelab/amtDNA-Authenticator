@@ -5,8 +5,8 @@ import subprocess
 import pandas as pd
 import os
 import logging
-import authpipe.configuration.configuration as config
-from authpipe.plot_utilities.plot_utilities import plot_training_results, plot_binary_perf, plot_binary_auroc_auprc, plot_binary_hist_dist
+import authpipe.core.configuration as config
+from authpipe.core.plot import plot_training_results, plot_binary_perf, plot_binary_auroc_auprc, plot_binary_hist_dist
 from math import floor
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVR

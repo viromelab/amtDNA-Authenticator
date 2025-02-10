@@ -2,8 +2,8 @@
 import subprocess
 import logging
 import os
-import authpipe.configuration.configuration as config
-from authpipe.data_processing_utilities.data_processing_utilities import read_multifasta, divide_set
+import authpipe.core.configuration as config
+from authpipe.core.data_processing import read_multifasta, divide_set
 
 def run_process_multifasta(multifasta_path, context_path, verbose, debug):
         

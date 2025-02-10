@@ -1,6 +1,6 @@
-import authpipe.configuration.configuration as config
+import authpipe.core.configuration as config
 from authpipe.process_multifasta.process_multifasta import read_multifasta
-from authpipe.training_utilities.training_utilities import authentication
+from authpipe.core.training_core import authentication
 
 def run_authenticate(threshold, model, context_path, samples_path):
   

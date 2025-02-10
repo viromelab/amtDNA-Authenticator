@@ -4,8 +4,8 @@ import random
 import os
 import subprocess
 import logging
-import authpipe.configuration.configuration as config
-from authpipe.general_utilities.general_utilities import is_number
+import authpipe.core.configuration as config
+from authpipe.core.utils import is_number
 
 samples_train = None 
 samples_test = None 

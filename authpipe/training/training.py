@@ -1,8 +1,8 @@
 import os
 import subprocess
-import authpipe.configuration.configuration as config
-from authpipe.data_processing_utilities.data_processing_utilities import load_features
-from authpipe.training_utilities.training_utilities import build_authenticator
+import authpipe.core.configuration as config
+from authpipe.core.data_processing import load_features
+from authpipe.core.training_core import build_authenticator
 
 def run_train(lbound, rbound, window, model, context_path, plot_results, verbose, debug):
   
