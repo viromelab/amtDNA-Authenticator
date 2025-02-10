@@ -2,11 +2,57 @@ import authpipe.configuration.configuration as config
 import matplotlib.pyplot as plt
 import logging
 
-LABEL_SIZE = 16
+LABEL_SIZE = 12
 
 # Set the font size for tick labels
 plt.rcParams['xtick.labelsize'] = LABEL_SIZE  # For x-axis tick labels
 plt.rcParams['ytick.labelsize'] = LABEL_SIZE  # For y-axis tick labels
+
+def plot_training_results(acc_array, precision_array, recall_array, f1_weighted_array,
+                            honest_coin_random_array, y_pred_ancient_array, false_predictions, random_array, auroc_array, auprc_array, samples_per_century_array, n_intervals_x):
+    
+    figure, axis = plt.subplots(1, 3)  
+    
+    plt.ylim(0, 1)
+    
+    axis[0].set_title('Performance indicators')
+    axis[0].set_xlabel('Generations')
+    axis[0].set_ylabel('Normalized Value')
+    
+    axis[0].plot(range(1, n_intervals_x), acc_array, color='blue', label='Accuracy')
+    axis[0].plot(range(1, n_intervals_x), false_predictions,
+              color='red', alpha=0.5, label='False Predictions')
+    axis[0].plot(range(1, n_intervals_x), random_array, color='green',
+              linestyle='dashed', alpha=0.5, label='Random')
+    axis[0].plot(range(1, n_intervals_x), f1_weighted_array, color='black', label='F1 Score')
+
+    axis[0].legend(loc='lower right')
+
+    axis[1].set_title('AUROC/AUPRC')
+
+    axis[1].set_xlabel('Generations')
+    axis[1].set_ylabel('Normalized Value')
+    
+    axis[1].plot(range(1, n_intervals_x), auroc_array, color='blue', label='AUROC')
+    axis[1].plot(range(1, n_intervals_x), auprc_array, color='red', linestyle='dotted', label='AUPRC')
+
+    axis[1].set_xlabel('Generations')  # Add labels to the axis
+    axis[1].set_ylabel('Normalized Value')
+    axis[1].legend(loc='lower right')
+    
+    keys = list(samples_per_century_array.keys())
+    values = list(samples_per_century_array.values())
+
+    axis[2].set_title('Distribution by century')
+
+    axis[2].bar(keys, values, alpha=0.5)
+    
+    axis[2].set_xlabel('Generations')
+    axis[2].set_ylabel('Normalized Value')
+
+    plt.show()
+    plt.close()
+
 
 def plot_binary_auroc_auprc(auroc_arr, auprc_arr, n_intervals_x):
     figure, axis = plt.subplots(1, 1)  # Adjust figure size if needed

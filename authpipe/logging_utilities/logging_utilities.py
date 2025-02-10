@@ -1,11 +1,13 @@
 import logging
 import colorlog
+import authpipe.configuration.configuration as config
 
 VERBOSE = 15
 logging.addLevelName(VERBOSE, "VERBOSE")
 
 def verbose(msg, *args, **kwargs):
-    logging.log(VERBOSE, msg, *args, **kwargs)
+    if config.settings.verbose:
+        logging.log(VERBOSE, msg, *args, **kwargs)
     
 def setup_log():
     formatter = colorlog.ColoredFormatter(
@@ -34,7 +36,11 @@ def setup_log():
     logging.getLogger().addHandler(file_handler)
     logger = logging.getLogger() 
     logger.addHandler(handler)
-    logger.setLevel(VERBOSE) 
+    
+    if config.settings.debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(VERBOSE)
     
     logging.verbose = verbose
       

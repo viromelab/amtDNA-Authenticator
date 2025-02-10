@@ -1,345 +1,223 @@
 import re
-import numpy as np
-import joblib
 import subprocess
-import pandas as pd
 import os
 import random
 import logging
-import colorlog
+import click
 import authpipe.configuration.configuration as config
-from argparse import ArgumentParser, Namespace
-from authpipe.plot_utilities.plot_utilities import plot_binary_perf, plot_binary_auroc_auprc, plot_binary_hist_dist
-from authpipe.data_processing_utilities.data_processing_utilities import read_multifasta, divide_set, load_sets, get_falcon_scores, integrate_falcon_data, get_falcon_predictions, get_quantitative_data, merge_data, extract_features, load_features
 from authpipe.logging_utilities.logging_utilities import setup_log
-from math import floor
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVR
-from sklearn.neural_network import MLPRegressor
-from sklearn.svm import SVR
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, confusion_matrix, roc_auc_score, average_precision_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from xgboost import XGBRegressor
-from colorama import Fore, Back, Style
+from authpipe.process_multifasta.process_multifasta import run_process_multifasta
+from authpipe.extract_features.extract_features import run_extract_features
+from authpipe.training.training import run_train
+from authpipe.authenticate.authenticate import run_authenticate
 
-def train(threshold, model_name):
-    df_train = config.settings.df_train
-    context_path = config.settings.context_path
-    
-    # Separate features (X) and target (y)
-    X_train = df_train[['falcon_estimated_age', 'cg_content', 'relative_size', 'n_content']]
-    # X_train = df_train[['falcon_estimated_age']]
-    y_train = df_train['age']
+# ----------------------------------------------------------------------
+# Section: Main
+# ----------------------------------------------------------------------
 
-    y_train = pd.DataFrame(
-        [1 if value >= threshold else 0 for value in y_train])
-    y_train_categories = y_train.copy()
-
-    if model_name == 'XGB':
-        model = XGBRegressor()
-    elif model_name == 'KNN':
-        model = KNeighborsRegressor(n_neighbors=40)
-    elif model_name == 'SVM':
-        model = SVR()
-    elif model_name == 'NET':
-        model = MLPRegressor(hidden_layer_sizes=(
-            100, 100), max_iter=500, random_state=42)
-    elif model_name == 'GNB':
-        model = GaussianNB()
-    else:
-        logging.error('Invalid model! Run \'authpipe --help\' to check the models available!')
-        exit()
-
-    # Train model
-    model.fit(X_train, y_train.values.ravel())
-
-    # Make predictions on testing set
-    y_pred = model.predict(X_train)
-
-    # y_pred = pd.DataFrame([1 if pred >= threshold else 0 for pred in y_pred])
-    y_pred = pd.DataFrame([1 if pred >= 0.5 else 0 for pred in y_pred])
-
-    # Evaluate model performance
-    acc = (y_train == y_pred).mean()
-    precision = precision_score(y_train, y_pred, zero_division=0)
-    recall = recall_score(y_train, y_pred, zero_division=0)
-    f1 = f1_score(y_train, y_pred)
-    cm = confusion_matrix(y_train, y_pred, labels=[0, 1])
-
-    # Save the trained model
-    model_file_name = os.path.join(context_path, 'models/model_' + model_name + '.joblib')
-    joblib.dump(model, model_file_name)
-
-    return acc, precision, recall, f1, y_train, y_pred, cm, y_train_categories
-
-
-def test(threshold, model_name):
-    df_test = config.settings.df_test
-    df_train = config.settings.df_train
-    context_path = config.settings.context_path
-
-    # Separate features (X) and target (y)
-    X_test = df_test[['falcon_estimated_age', 'cg_content', 'relative_size', 'n_content']]
-    # X_test = df_test[['falcon_estimated_age']]
-    y_test = df_test['age']
-    # Save the trained model
-    model_file_name = os.path.join(
-        context_path, 'models/model_' + model_name + '.joblib')
-    # Load the saved model
-    model = joblib.load(model_file_name)
-
-    y_test_categories = y_test.copy()
-    y_test_categories = [int(i/100) for i in y_test_categories]
-    y_test = pd.DataFrame([1 if value >= threshold else 0 for value in y_test])
-
-    # Make predictions on testing set
-    y_pred = model.predict(X_test)
-    # y_pred = pd.DataFrame([1 if pred >= threshold else 0 for pred in y_pred])
-    y_pred = pd.DataFrame([1 if pred >= 0.5 else 0 for pred in y_pred])
-
-    # Evaluate model performance
-    acc = (y_test == y_pred).mean()
-    precision = precision_score(y_test, y_pred, zero_division=0)
-    recall = recall_score(y_test, y_pred, zero_division=0)
-    f1 = f1_score(y_test, y_pred)
-    cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
-
-    if y_test.nunique().values[0] > 1:
-        auroc = roc_auc_score(y_test, y_pred)
-        auprc = average_precision_score(y_test, y_pred)
-    else:
-        auroc = 0
-        auprc = 0
-
-    return acc, precision, recall, f1, y_test, y_pred, cm, y_test_categories, auroc, auprc
-
-
-def build_authenticator(model_name):
-    n_intervals = config.settings.n_intervals
-    window = config.settings.window
-    rbound = config.settings.rbound
-    lbound = config.settings.lbound
-    plot_mode = config.settings.plot_mode
-    verbose = config.settings.verbose
-    n_intervals_x = config.settings.n_intervals
-    
-    auroc_array = []
-    auprc_array = []
-    acc_array = []
-    precision_array = []
-    recall_array = []
-    f1_array = []
-    always_ancient_random_array = []
-    honest_coin_random_array = []
-    y_pred_ancient_array = []
-    random_array = []
-    C00_array = []
-    C01_array = []
-    C10_array = []
-    C11_array = []
-    f1_weighted_array = []
-
-    max_lim = int(rbound/window)
-    min_lim = int(lbound/window)
-    
-    n_intervals = max_lim - min_lim + 1
-
-    samples_per_century_array = {i: 0 for i in range(0, n_intervals)}
-    
-    for threshold in range(min_lim, max_lim):
-        if verbose:
-            logging.verbose(f'Threshold cut: {threshold}/{n_intervals - 1}')
-
-        train(threshold=window*threshold, model_name=model_name)
-        acc, precision, recall, f1, y_true, y_pred, cm, y_true_categories, auroc, auprc = test(
-                threshold=window*threshold, model_name=model_name)
-
-        auroc_array.append(auroc)
-        auprc_array.append(auprc)
-        acc_array.append(acc)
-        precision_array.append(precision)
-        recall_array.append(recall)
-        f1_array.append(f1)
-        always_ancient_random_array.append(
-            y_true.sum().values[0]/len(y_true))
-        honest_coin_random_array.append(y_true.sum().values[0]/len(y_true))
-        y_pred_ancient_array.append(y_pred.sum()/len(y_pred))
-
-        num_of_positives = y_true.sum().values[0]
-        num_of_samples = len(y_true)
-
-        random_val = max(num_of_positives, num_of_samples -
-                            num_of_positives) / num_of_samples
-
-        random_array.append(random_val)
+@click.group()
+@click.option(
+    '-v',
+    '--verbose', 
+    is_flag=True, 
+    help="Verbose mode"
+)
+@click.option(
+    '-d',
+    '--debug', 
+    is_flag=True, 
+    help="Debug mode"
+)
+@click.pass_context
+def main(ctx, verbose, debug, no_args_is_help=True, **kwargs):
+    ctx.ensure_object(dict)
+    ctx.obj['verbose'] = verbose
+    ctx.obj['debug'] = debug
         
-        f1_weighted = f1_score(y_true, y_pred, average='weighted')
-
-        f1_weighted_array.append(f1_weighted)
-
-        C00_array.append(cm[0][0]/num_of_samples)
-        C01_array.append(cm[0][1]/num_of_samples)
-        C10_array.append(cm[1][0]/num_of_samples)
-        C11_array.append(cm[1][1]/num_of_samples)
-
-        y_true_categories = list(y_true_categories)
-        y_true_categories_unique = list(set(y_true_categories))
-
-        samples_per_century = {i: y_true_categories.count(
-            i) for i in y_true_categories_unique if i < n_intervals}
-
-        for key in samples_per_century.keys():
-            samples_per_century_array[key] += samples_per_century[key]
-
-    total_samples = 0
-    for key in samples_per_century_array.keys():
-        total_samples += samples_per_century_array[key]
-
-    if total_samples == 0:
-        logging.error(f'Zero samples found! Exiting...')
-        exit()
-        
-    for key in samples_per_century_array.keys():
-        samples_per_century_array[key] = samples_per_century_array[key]/total_samples
-
-    true_predictions = [C00_array[i] + C11_array[i]
-                        for i in range(len(C00_array))]
-    false_predictions = [C01_array[i] + C10_array[i]
-                            for i in range(len(C01_array))]
-
-    if plot_mode:
-        plot_binary_perf(acc_array, precision_array, recall_array, f1_weighted_array,
-                            honest_coin_random_array, y_pred_ancient_array, false_predictions, random_array, n_intervals_x)
-        plot_binary_auroc_auprc(auroc_array, auprc_array, n_intervals_x)
-        plot_binary_hist_dist(samples_per_century_array)
-
-
-def main():
-    setup_log()
-    
-    parser = ArgumentParser()
-        
-    parser.add_argument(
-        '--phase',
-        choices=['multifasta', 'feature_extraction', 'training', 'auth'],
-        help="The phase from which to run the program in:\n"
-        "  - multifasta: Start with an all-samples multifasta file.\n"
-        "  - feature_extraction: Samples are already locally divided into training, validation and test, then extract features.\n"
-        "  - training: Sets and features are ready, proceede to train.\n"
-        "  - auth: Authenticates a fasta sequence with an already trained model.\n",
-        required=True  # Makes the argument mandatory
-    )
-    
-    parser.add_argument(
-        '--model',
-        choices=['XGB', 'KNN', 'NET', 'SVM', 'GNB'],
-        help="The model to use in training phase [Default: XGB]:\n"
-        "  - XGB: XGBoost.\n"
-        "  - KNN: K-Nearest Neighbors.\n"
-        "  - NET: Neural Network.\n"
-        "  - SVM: Support Vector Machine.\n"
-        "  - GNB: Gaussian Naive Bayes.\n",
-        default='XGBoost'
-    )
-    
-    parser.add_argument(
-        '--window',
-        choices=['10', '100', '1000'],
-        help="The time window to use in training phase [Default: 100] :\n"
-        "  - 10: 10 years threshold cuts.\n"
-        "  - 100: 100 years threshold cuts.\n"
-        "  - 1000: 1000 years threshold cuts.\n",
-        default='100'
-    )
-    
-    parser.add_argument(
-        '--rbound',
-        help="The max time considered for the threshold sliding"
-    )
-    
-    parser.add_argument(
-        '--lbound',
-        help="The min time considered for the threshold sliding"
-    )
-    
-    parser.add_argument('--context', help='Path to folder to store/retrieve application context [Will be created if does not exist]', required=True)
-    
-    parser.add_argument('--perf', action='store_true', help='Output plot of training\'s performance indicators [File perf_ind.png in running folder]')
-    
-    # Set tools from command line
-    parser.add_argument('--PCA', action='store_true', help='Calculate PCA')
-    parser.add_argument('--plot', action='store_true', help='Plot data')
-    parser.add_argument('--verbose', action='store_true', help='Verbose mode')
-
-    # Set output destionation from command line
-    parser.add_argument(
-        '--output', help='Set output destination [Default: .]', default='.')
-    
-    # Get arguments from command line
-    args: Namespace = parser.parse_args()
-
-    plot_mode = args.plot
-    verbose = args.verbose
-    rbound = float(args.rbound)
-    lbound = float(args.lbound)
-    window = float(args.window)
-    context_path = args.context
-    model_name = args.model
-    
-    n_intervals = None
-    if not (rbound is None) and not (lbound is None):
-        n_intervals = int((rbound - lbound) / window) + 1
-        
-    subprocess.run(['mkdir', '-p', context_path + '/.tops/'])
-    subprocess.run(['mkdir', '-p', context_path + '/models/'])
-     
-    config.settings.context_path = context_path
-    config.settings.rbound = rbound
-    config.settings.lbound = lbound
-    config.settings.window = window
     config.settings.execution_path = os.path.dirname(os.path.abspath(__file__))
     config.settings.verbose = verbose
-    config.settings.plot_mode = plot_mode
-    config.settings.n_intervals = n_intervals
+    config.settings.debug = debug
 
-    next_phase = ''
-    if args.phase == 'multifasta':
-        logging.info('On multifasta phase...')
-        
-        subprocess.run(['rm', context_path + '/.tops/*'])
-        
-        read_multifasta()
-        divide_set()
-        extract_features()
-        load_features()
-        build_authenticator(model_name)
-
-    elif args.phase == 'feature_extraction':
-        logging.info('On feature_extraction phase...')
-
-        load_sets()
-        extract_features()
-        build_authenticator(model_name)
+    setup_log()
     
-    elif args.phase == 'training':
-        logging.info('On training phase...')
-        
-        load_features()
-        build_authenticator(model_name)
-        
-    elif args.phase == 'auth':
-        pass
-        
-    elif args.verbose:
-        verbose = True
+# ----------------------------------------------------------------------
+# Section: Process Multifasta
+# ----------------------------------------------------------------------
 
-    # if args.PCA:
-    #     calculate_pca()
-    #     return
+@main.command()
+@click.option(
+    '-p',
+    '--multifasta_path',
+    type=click.Path(writable=True, dir_okay=False, file_okay=True),
+    show_default=True,
+    help='Path to multifasta that will be used in training phase'
+)
+@click.option(
+    '-c',
+    '--context_path',
+    type=click.Path(writable=True, dir_okay=True, file_okay=False),
+    show_default=True,
+    help='Path to folder to store/retrieve application context [Will be created if does not exist]', 
+    required=True
+)
+@click.pass_context
+def process_multifasta(ctx, no_args_is_help=True, **kwargs):
+    """Process, uniformize and divide (Train, Val and Test) multi-FASTA"""
+    
+    logging.info('Processing Multi-FASTA...')
+    
+    phase = 'multifasta'
+    
+    config.settings.phase = phase
+    
+    run_process_multifasta(**kwargs, **ctx.obj)
 
+# ----------------------------------------------------------------------
+# Section: Extract Features 
+#   - Multi-FASTA already processed and features ready for extraction
+# ----------------------------------------------------------------------
 
+@main.command()
+@click.option(
+    '-c',
+    '--context_path',
+    type=click.Path(writable=True, dir_okay=True, file_okay=False),
+    show_default=True,
+    help='Path to folder to store/retrieve application context [It should exist from previous multi-FASTA processing!]', 
+    required=True
+)
+@click.option(
+    '-f',
+    '--falcon_verbose',
+    is_flag=True,
+    help='Show FALCON verbose', 
+)
+@click.pass_context
+def extract_features(ctx, no_args_is_help=True, **kwargs):
+    """Extract features from processed sub-groups of multi-FASTA (Train, Val and Test)"""
+    
+    logging.info('Extracting Features...')
+    
+    phase = 'extract_features'
+    
+    config.settings.phase = phase
+    
+    run_extract_features(**kwargs, **ctx.obj)
+    
+# ----------------------------------------------------------------------
+# Section: Training model 
+#   - Train model on features already extracted from multi-FASTAS
+# ----------------------------------------------------------------------
+
+@main.command()
+@click.option(
+    '-l', 
+    '--lbound', 
+    type=int, 
+    help='The min year considered for the threshold sliding')
+@click.option(
+    '-r',
+    '--rbound',
+    type=int,
+    help='The max year considered for the threshold sliding'
+)
+@click.option(
+    '-w', 
+    '--window', 
+    type=int, 
+    help='The time window to use in training phase [Default: 100] :\n'
+         '  - 10: 10 years threshold cuts.\n'
+         '  - 100: 100 years threshold cuts.\n'
+         '  - 1000: 1000 years threshold cuts.\n')
+@click.option(
+    '-m',
+    '--model',
+    type=click.Choice(['XGB', 'KNN', 'NET', 'SVM', 'GNB']),
+    help="The model to use in training phase [Default: XGB]:\n"
+    "  - XGB: XGBoost.\n"
+    "  - KNN: K-Nearest Neighbors.\n"
+    "  - NET: Neural Network.\n"
+    "  - SVM: Support Vector Machine.\n"
+    "  - GNB: Gaussian Naive Bayes.\n",
+    default='XGBoost'
+)
+@click.option(
+    '-c',
+    '--context_path',
+    type=click.Path(writable=True, dir_okay=True, file_okay=False),
+    show_default=True,
+    help='Path to folder to store/retrieve application context [It should exist from previous multi-FASTA processing!]', 
+    required=True
+)
+@click.option(
+    '-p',
+    '--plot_results',
+    is_flag=True,
+    help='Plot results from training phase', 
+    required=True
+)
+@click.pass_context
+def train(ctx, no_args_is_help=True, **kwargs):
+    """Train model over features extracted from processed sub-groups of multi-FASTA (Train, Val and Test)"""
+    
+    logging.info('Training Model...')
+    
+    phase = 'train'
+    
+    config.settings.phase = phase
+    
+    run_train(**kwargs, **ctx.obj)
+    
+# ----------------------------------------------------------------------
+# Section: Authenticate 
+#   - Authenticate samples
+# ----------------------------------------------------------------------
+
+@main.command()
+@click.option(
+    '-t', 
+    '--threshold', 
+    type=int, 
+    help='Threshold to consider ancient in authentication')
+@click.option(
+    '-m',
+    '--model',
+    type=click.Choice(['XGB', 'KNN', 'NET', 'SVM', 'GNB']),
+    help="The model to use in training phase [Default: XGB]:\n"
+    "  - XGB: XGBoost.\n"
+    "  - KNN: K-Nearest Neighbors.\n"
+    "  - NET: Neural Network.\n"
+    "  - SVM: Support Vector Machine.\n"
+    "  - GNB: Gaussian Naive Bayes.\n",
+    default='XGBoost'
+)
+@click.option(
+    '-c',
+    '--context_path',
+    type=click.Path(writable=True, dir_okay=True, file_okay=False),
+    show_default=True,
+    help='Path to folder to store/retrieve application context [It should exist from previous multi-FASTA processing!]', 
+    required=True
+)
+@click.option(
+    '-p',
+    '--samples_path',
+    type=click.Path(writable=True, dir_okay=True, file_okay=False),
+    show_default=True,
+    help='Path to FASTA/multi-FASTA file with samples to authenticate', 
+    required=True
+)
+@click.pass_context
+def authenticate(ctx, no_args_is_help=True, **kwargs):
+    """Authenticate samples from FASTA/multi-FASTA file as Modern/Ancient given a threshold age"""
+    
+    logging.info('Authenticate Samples...')
+    
+    phase = 'authenticate'
+    
+    config.settings.phase = phase
+    
+    run_authenticate(**kwargs, **ctx.obj)
+    
 if __name__ == '__main__':
     main()

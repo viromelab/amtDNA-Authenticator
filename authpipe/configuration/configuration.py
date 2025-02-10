@@ -1,6 +1,9 @@
 class Settings:
     def __init__(self):
+        self.phase = None
         self.context_path = None
+        self.samples_path = None
+        self.threshold = None
         self.window = None
         self.rbound = None
         self.lbound = None
@@ -9,12 +12,15 @@ class Settings:
         self.df_test = None
         self.plot_mode = False
         self.verbose = False
+        self.falcon_verbose = False
+        self.debug = False
         self.samples = {}
         self.samples_train = {}
         self.samples_test = {}
         self.samples_val = {}
         self.execution_path = None
         self.n_intervals = None
+        self.model = None
         
     def update(self, updates):
         for key, value in updates.items():
