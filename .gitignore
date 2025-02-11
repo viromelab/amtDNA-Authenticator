@@ -1,5 +1,4 @@
 auth_pipeline.egg-info
 __pycache__/
-authpipe/__pycache__/
 *.pyc
 .venv
