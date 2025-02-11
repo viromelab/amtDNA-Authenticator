@@ -18,7 +18,6 @@ from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_sc
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from xgboost import XGBRegressor
-from colorama import Fore, Back, Style
 
 
 def train(threshold, model_name):

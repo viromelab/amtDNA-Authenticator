@@ -46,13 +46,6 @@ def main(ctx, verbose, debug, no_args_is_help=True, **kwargs):
 
 @main.command()
 @click.option(
-    '-p',
-    '--multifasta_path',
-    type=click.Path(writable=True, dir_okay=False, file_okay=True),
-    show_default=True,
-    help='Path to multifasta that will be used in training phase'
-)
-@click.option(
     '-c',
     '--context_path',
     type=click.Path(writable=True, dir_okay=True, file_okay=False),
