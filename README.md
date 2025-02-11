@@ -24,7 +24,6 @@ This repository contains code for a feature based machine learning tool for auth
 * matplotlib
 * joblib
 * FALCON (needs to be installed separately)
-* colorama
 
 ## Installation steps
 
@@ -75,36 +74,56 @@ https://github.com/cobilab/falcon
 
 To run an example
 
-
 ## Usage
 
 1. **Prepare Data:**
-    * Create a `multifasta.fa` file containing all ancient DNA sequences with headers in the format `>ID_AGE`.
-    * Place the `multifasta.fa` file in a directory. This will be your `context` directory.
-2. **Run the pipeline:**
+    * Create a `multifasta.fa` file containing ancient DNA sequences for training, validation and testing. Place it in a first directory. This will be your `context` directory.
+
+    * Create a `multifasta.fa` file containing ancient DNA sequences for authentication. Place it in a second directory. This will be your `auth` directory.
+
+    * DNA sequences headers must have the format `>ID_AGE`.
+
+2. **Run the processing-multifasta mode:**
+    * This mode will process the multifasta in the context folder, capitalizing the characters to ensure uniformity, removing duplicate samples, and dividing the data into training, validation and testing sets.
+
     ```bash
-    authpipe --phase multifasta --model XGB --window 100 --rbound 10000 --lbound 0 --context /path/to/your/context/directory
+    authpipe process-multifasta --context PATH-TO-CONTEXT-DIRECTORY
     ```
-    * Replace `/path/to/your/context/directory` with the actual path.
+    * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path.
+
+3. **Run the extract-features mode:**
+    * This mode will load the data processed in the processing-multifasta mode and stored in the context folder, processing it further to extract features for the input vector of the machine learning model.
+
+    ```bash
+    authpipe extract_features --context PATH-TO-CONTEXT-DIRECTORY
+    ```
+
+    * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path (It should be the same as the used in the process-multifasta mode!).
+
+4. **Run the train mode:**
+    * This mode will train a machine learning model (Selected in command line) on the extracted features. 
+
+    ```bash
+    authpipe train --context PATH-TO-CONTEXT-DIRECTORY --lbound L_BOUND --rbound R_BOUND --window WINDOW --model MODEL
+    ```
+
     * You can change the `--model` argument to use a different machine learning model.
     * The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
 
+5. **Run the authenticate mode:**
+    * This mode authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN based on the models trained in the train mode.
 
-## Phases
+    ```bash
+    authpipe authenticate --context PATH-TO-CONTEXT-DIRECTORY --auth_path PATH-TO-AUTH-DIRECTORY --threshold THRESHOLD --model MODEL
+    ```
+    * Replace `PATH-TO-AUTH-DIRECTORY` with the path to a folder with the multi-FASTA containing the samples to be authenticated.
+    * You can choose the model and threshold accordingly to the existent in the PATH-TO-CONTEXT-DIRECTORY/models folder.
 
-The pipeline can be run in different phases:
-
-* **multifasta:**  Starts with the `multifasta.fa` file, divides the data into training and testing sets, extracts features, and trains the model.
-* **feature_extraction:**  Assumes the data is already divided into training and testing sets and proceeds with feature extraction and model training.
-* **training:** Assumes the features are already extracted and proceeds with model training.
-* **auth:**  Authenticates a new FASTA sequence using a pre-trained model (not implemented in the provided code).
-
-
-## Output
+## Outputs
 
 * The trained model is saved in the `models` directory inside the context directory passed in command line.
 * Performance metrics and plots are generated using pyplot and can be saved locally.
-
+* Authentication files are saved in the `PATH-TO-AUTH-DIRECTORY` folder.
 
 ## License
 
