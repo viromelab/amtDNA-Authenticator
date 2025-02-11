@@ -4,4 +4,5 @@ xgboost
 pandas
 matplotlib
 numpy
-colorama
+click
+colorlog
