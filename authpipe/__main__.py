@@ -196,22 +196,22 @@ def train(ctx, no_args_is_help=True, **kwargs):
     '--context_path',
     type=click.Path(writable=True, dir_okay=True, file_okay=False),
     show_default=True,
-    help='Path to folder to store/retrieve application context [It should exist from previous multi-FASTA processing!]', 
+    help='Path to folder to store/retrieve application context [It should exist from previous training!]', 
     required=True
 )
 @click.option(
     '-p',
-    '--samples_path',
+    '--auth_path',
     type=click.Path(writable=True, dir_okay=True, file_okay=False),
     show_default=True,
-    help='Path to FASTA/multi-FASTA file with samples to authenticate', 
+    help='Path to folder with multi-FASTA to authenticate and to save authentication context', 
     required=True
 )
 @click.pass_context
 def authenticate(ctx, no_args_is_help=True, **kwargs):
     """Authenticate samples from FASTA/multi-FASTA file as Modern/Ancient given a threshold age"""
     
-    logging.info('Authenticate Samples...')
+    logging.info('Authenticating Samples...')
     
     phase = 'authenticate'
     

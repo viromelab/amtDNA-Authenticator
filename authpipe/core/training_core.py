@@ -122,8 +122,6 @@ def build_authenticator(model_name, plot_results):
     window = config.settings.window
     rbound = config.settings.rbound
     lbound = config.settings.lbound
-    plot_mode = config.settings.plot_mode
-    verbose = config.settings.verbose
     n_intervals_x = config.settings.n_intervals
 
     auroc_array = []
@@ -226,16 +224,40 @@ def authentication():
     model = config.settings.model
     threshold = config.settings.threshold 
     context_path = config.settings.context_path 
-    samples_path = config.settings.samples_path 
-    samples = config.settings.samples
+    auth_path = config.settings.auth_path 
+    df_auth = config.settings.df_auth
     
     model_file_path = os.path.join(
         context_path, 'models/model_' + model + '_' + str(threshold) + '.joblib')
     
     if not os.path.exists(model_file_path):
-        train(threshold=threshold, model_name=model)
+        logging.error(f'Model trained with threshold {threshold} does not exist! Reviewe your context/models/ folder to see the available models or train a new one')
+        exit()
 
-    model = joblib.load(model_file_path)
+    model_instance = joblib.load(model_file_path)
     
-    for sample in samples:
-        pass
+    # Separate features (X) and target (y)
+    X_test = df_auth[['falcon_estimated_age',
+                      'cg_content', 'relative_size', 'n_content']]
+    # X_test = df_auth[['falcon_estimated_age']]
+    y_test = df_auth['id']
+    
+    y_pred = model_instance.predict(X_test)
+    y_pred = [1 if pred >= 0.5 else 0 for pred in y_pred]
+    
+    auth_results_file_path = os.path.join(auth_path, f'auth_results_{model}_{threshold}.txt')
+    with open(auth_results_file_path, 'w') as auth_results_file:
+        idx = 0
+        for id in y_test:
+            if y_pred[idx] == 1:
+                result_line = f'Sample {id} classified as ANCIENT with threshold {threshold} and model {model}'
+                auth_results_file.write(result_line)
+                auth_results_file.write('\n')
+                logging.verbose(result_line)
+            else:
+                result_line = f'Sample {id} classified as MODERN with threshold {threshold} and model {model}'
+                auth_results_file.write(result_line)
+                auth_results_file.write('\n')
+                logging.verbose(result_line)
+
+            idx += 1

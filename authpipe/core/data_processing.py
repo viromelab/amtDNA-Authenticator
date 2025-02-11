@@ -16,19 +16,16 @@ def read_multifasta():
     
     phase = config.settings.phase
     context_path = config.settings.context_path
+    auth_path = config.settings.auth_path
+
+    multifasta_file_path = os.path.join(context_path, 'multifasta.fa')  
+    if phase == 'authenticate':
+        multifasta_file_path = os.path.join(auth_path, 'multifasta.fa')
     
-    if phase == 'process_multifasta':
-        multifasta_file_path = os.path.join(context_path, 'multifasta.fa')
-        multifasta_file = open(multifasta_file_path, 'r')
-        multifasta = multifasta_file.read()
-        multifasta = multifasta.upper()
-        multifasta_file.close()
-    elif phase == 'authenticate':
-        multifasta_file_path = config.settings.samples_path
-        multifasta_file = open(multifasta_file_path, 'r')
-        multifasta = multifasta_file.read()
-        multifasta = multifasta.upper()
-        multifasta_file.close()
+    multifasta_file = open(multifasta_file_path, 'r')
+    multifasta = multifasta_file.read()
+    multifasta = multifasta.upper()
+    multifasta_file.close()
 
     pattern = re.compile(r'>(.*?)\n([\s\S]*?)(?=\n>|\Z)', re.DOTALL)
 
@@ -42,19 +39,25 @@ def read_multifasta():
     
     for sample in fastas_content:
         raw_header = sample[0]
-        header = raw_header.replace('>', '')
-        header = header.split('_')
-        id = header[0]
-        age = header[-1]
         
-        if not is_number(age):
-            logging.warning(f'Could not process age from sample with id {id}. Found age: {age}')
-            continue
+        if phase == 'authenticate':
+            id = raw_header.replace('>', '')
+            age = '?'
         
-        age = float(age)
+        else:
+            header = raw_header.replace('>', '')
+            header = header.split('_')
+            id = header[0]
+            age = header[-1]
+        
+            if not is_number(age):
+                logging.warning(f'Could not process age from sample with id {id}. Found age: {age}')
+                continue
+            
+            age = float(age)
 
-        if age > max_age:
-            max_age = age
+            if age > max_age:
+                max_age = age
             
         seq = sample[1].replace('\n', '')
 
@@ -66,7 +69,10 @@ def read_multifasta():
         samples[id] = [id, age, seq]
 
     logging.verbose(f'Found {counter} different samples!')
+
     config.settings.samples = samples
+    if phase == 'authenticate':
+        config.settings.samples_auth = samples
     
     
 def divide_set():
@@ -206,7 +212,7 @@ def load_sets():
         logging.error(f'Could not find train FASTA files to load in {train_file_path}')
         exit()
     
-    logging.verbose(f'Train samples loaded from {train_file_path}...')
+    logging.verbose(f'Training samples loaded from {train_file_path}...')
     
     if os.path.exists(val_file_path):
         logging.verbose(f'Loading val set from {val_file_path}...')
@@ -299,14 +305,24 @@ def load_sets():
     
 
 def get_falcon_scores():
-    context_path = config.settings.context_path
-    samples = config.settings.samples
-    context_path = config.settings.context_path
-    
-    train_multifasta_file_name = os.path.join(context_path, 'train_multifasta.fa')
-    
     logging.verbose(f'Calculating FALCON scores...')
     
+    context_path = config.settings.context_path
+    auth_path = config.settings.auth_path
+    samples = config.settings.samples
+    phase = config.settings.phase
+    
+    train_multifasta_file_path = os.path.join(context_path, 'train_multifasta.fa')
+    
+    env_path = context_path
+    if phase == 'authenticate':
+        env_path = auth_path
+    
+    tops_path = os.path.join(env_path, 'tops/')
+    if os.path.exists(tops_path):
+        subprocess.run(['rm', '-rf', tops_path])
+    subprocess.run(['mkdir', '-p', tops_path])
+        
     # Run on Falcon
     count = 1
     samples_len = len(samples.keys())
@@ -317,13 +333,13 @@ def get_falcon_scores():
         header = '>' + id  + ' ' + str(age)
         seq = sample[2]
 
-        temp_fasta_file_name = os.path.join(context_path, 'temp_fasta.fa')
-        temp_fasta_file = open(temp_fasta_file_name, 'w')
+        temp_fasta_file_path = os.path.join(env_path, 'temp_fasta.fa')
+        temp_fasta_file = open(temp_fasta_file_path, 'w')
         temp_fasta_file.write(header)
         temp_fasta_file.write('\n')
         temp_fasta_file.write(seq)
 
-        top_file_name = os.path.join(context_path, 'tops/' + id + '_' + str(age) + '_top.txt') 
+        top_file_path = os.path.join(tops_path, id + '_' + str(age) + '_top.txt') 
 
         msg = '[FALCON] ' + str(count) + '/' + str(samples_len)
         logging.verbose(f'[{count}/{samples_len}]')
@@ -332,30 +348,37 @@ def get_falcon_scores():
         with open(os.devnull, 'w') as devnull:
             # ./FALCON -m 6:1:0:0/0 -m 11:10:0:0/0 -m 13:200:1:3/1  -g 0.85 -v -F -t 50 -n 6 -x top_n1.txt FASTA_SAMPLE MTDB
             if config.settings.falcon_verbose:
-                subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_name, temp_fasta_file_name, train_multifasta_file_name])
+                subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_path, temp_fasta_file_path, train_multifasta_file_path])
             else:            
-                subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_name, temp_fasta_file_name, train_multifasta_file_name], stdout=devnull, stderr=devnull)
+                subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_path, temp_fasta_file_path, train_multifasta_file_path], stdout=devnull, stderr=devnull)
 
         temp_fasta_file.close()
 
 
 def integrate_falcon_data():
-    context_path = config.settings.context_path
-    
-    df = pd.DataFrame(columns=['set', 'id', 'age', 'top'])
-
-    folder_path = os.path.join(context_path,'tops/')
-    
     logging.verbose(f'Integrating FALCON data...')
     
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
+    context_path = config.settings.context_path
+    auth_path = config.settings.auth_path
+    samples = config.settings.samples
+    phase = config.settings.phase
+    
+    df = pd.DataFrame(columns=['set', 'id', 'age', 'top'])
+    
+    env_path = context_path
+    if phase == 'authenticate':
+        env_path = auth_path
+
+    tops_path = os.path.join(env_path, 'tops/')
+  
+    for filename in os.listdir(tops_path):
+        file_path = os.path.join(tops_path, filename)
         if os.path.isfile(file_path):
             header = filename.split('_')
             id = header[0]
             age = header[-2]
 
-            top_path = os.path.join(folder_path, filename)
+            top_path = os.path.join(tops_path, filename)
             file = open(top_path, '+r')
             
             top_lines = file.readlines()
@@ -365,7 +388,7 @@ def integrate_falcon_data():
 
             df = df._append({'id': id, 'age': age, 'top': top_list}, ignore_index=True)
 
-    output_file_name = os.path.join(context_path, 'falcon_integrated_data.csv')
+    output_file_name = os.path.join(env_path, 'falcon_integrated_data.csv')
     logging.verbose(f'Saving integrated FALCON data to {output_file_name}...')
     df.to_csv(output_file_name)
 
@@ -374,8 +397,15 @@ def get_falcon_estimations():
     logging.verbose(f'Calculating FALCON estimations...')
     
     context_path = config.settings.context_path
+    auth_path = config.settings.auth_path
+    samples = config.settings.samples
+    phase = config.settings.phase
     
-    input_file_name = os.path.join(context_path, 'falcon_integrated_data.csv')
+    env_path = context_path
+    if phase == 'authenticate':
+        env_path = auth_path
+    
+    input_file_name = os.path.join(env_path, 'falcon_integrated_data.csv')
     logging.verbose(f'Reading integrated falcon data from {input_file_name}...')
     df = pd.read_csv(input_file_name)
         
@@ -427,7 +457,7 @@ def get_falcon_estimations():
     falcon_features_df = pd.DataFrame(falcon_features, columns=['id', 'age', 'avg_age'])
     
     # Save dataframe
-    output_file_name = os.path.join(context_path, 'falcon_estimations.csv')
+    output_file_name = os.path.join(env_path, 'falcon_estimations.csv')
     logging.verbose(f'Saving FALCON estimations to {output_file_name}...')
     falcon_features_df.to_csv(output_file_name, index=False)
 
@@ -435,9 +465,15 @@ def get_falcon_estimations():
 def get_quantitative_data():
     logging.verbose(f'Extracting quantitative features (CG content, relative size, N content)...')
     
-    samples = config.settings.samples
     context_path = config.settings.context_path
+    auth_path = config.settings.auth_path
+    samples = config.settings.samples
+    phase = config.settings.phase
     
+    env_path = context_path
+    if phase == 'authenticate':
+        env_path = auth_path
+        
     seq_base_size = 17000
     sample_array = []
 
@@ -446,7 +482,7 @@ def get_quantitative_data():
 
         id = item[0]
 
-        id = id.split(' ')[0]
+        id = id.split('_')[0]
 
         age = item[1]
 
@@ -477,7 +513,7 @@ def get_quantitative_data():
 
     # save modern data to csv file
     df = pd.DataFrame({'id': id_array, 'real_age': age_array, 'relative_size': relative_size_array, 'cg_content': cg_content_array, 'n_content': n_content_array})
-    output_file_name = os.path.join(context_path, 'quantitative_data.csv')
+    output_file_name = os.path.join(env_path, 'quantitative_data.csv')
     logging.verbose(f'Saving quantitative features to {output_file_name}...')
     df.to_csv(output_file_name, index=False)
 
@@ -486,19 +522,28 @@ def merge_data():
     logging.verbose(f'Merging feature\'s data...')
     
     context_path = config.settings.context_path
+    auth_path = config.settings.auth_path
+    samples = config.settings.samples
+    phase = config.settings.phase
     samples_train = config.settings.samples_train
     samples_val = config.settings.samples_val
     samples_test = config.settings.samples_test
+    samples_auth = config.settings.samples_auth
     
-    falcon_features_path = os.path.join(context_path, 'falcon_estimations.csv')
+    env_path = context_path
+    samples_sets_names = ['train', 'val', 'test']
+    samples_sets = [samples_train, samples_val, samples_test]
+    if phase == 'authenticate':
+        env_path = auth_path
+        samples_sets_names = ['auth']
+        samples_sets = [samples_auth]
+        
+    falcon_features_path = os.path.join(env_path, 'falcon_estimations.csv')
     logging.verbose(f'Loading FALCON estimations from {falcon_features_path}...')
     df_falcon_features = pd.read_csv(falcon_features_path)
-    q_features_path = os.path.join(context_path, 'quantitative_data.csv')
+    q_features_path = os.path.join(env_path, 'quantitative_data.csv')
     logging.verbose(f'Loading quantitative features from {q_features_path}...')
     df_q_features = pd.read_csv(q_features_path)
-
-    samples_sets = [samples_train, samples_val, samples_test]
-    samples_sets_names = ['train', 'val', 'test']
 
     idx = 0
     for sample_set in samples_sets:
@@ -506,7 +551,7 @@ def merge_data():
         for id in sample_set:
             age = sample_set[id][1]
 
-            id = id.split(' ')[0]
+            id = id.split('_')[0]
 
             falcon_features = df_falcon_features[df_falcon_features['id']==id]
 
@@ -538,7 +583,7 @@ def merge_data():
                 new_row = {'id': id, 'age': age, 'falcon_estimated_age': falcon_estimated_age, 'relative_size': relative_size, 'cg_content': cg_content, 'n_content': n_content}
                 df_set = pd.concat([df_set, pd.DataFrame([new_row])], ignore_index=True)
                 
-        df_set_path = os.path.join(context_path, samples_sets_names[idx] + 'set_features.csv')
+        df_set_path = os.path.join(env_path, samples_sets_names[idx] + 'set_features.csv')
         idx += 1
         logging.verbose(f'Saving merged features to {df_set_path}...')
         df_set.to_csv(df_set_path, index=False)
@@ -555,30 +600,39 @@ def extract_features():
 def load_features():
     logging.verbose(f'Loading features...')
     
+    context_path = config.settings.context_path
+    auth_path = config.settings.auth_path
+    samples = config.settings.samples
+    phase = config.settings.phase
     window = config.settings.window
     
-    context_path = config.settings.context_path
-    
-    df_train_path = os.path.join(context_path, 'trainset_features.csv')
-    logging.verbose(f'Loading trainset features from {df_train_path}...')
-    df_train = pd.read_csv(df_train_path)
+    if phase == 'authenticate':
+        df_auth_path = os.path.join(auth_path, 'authset_features.csv')
+        logging.verbose(f'Loading authset features from {df_auth_path}...')
+        df_auth = pd.read_csv(df_auth_path)
+        
+        config.settings.df_auth = df_auth
+    else:
+        df_train_path = os.path.join(context_path, 'trainset_features.csv')
+        logging.verbose(f'Loading trainset features from {df_train_path}...')
+        df_train = pd.read_csv(df_train_path)
 
-    df_val_path = os.path.join(context_path, 'valset_features.csv')
-    logging.verbose(f'Loading valset features from {df_val_path}...')
-    df_val = pd.read_csv(df_val_path)
+        df_val_path = os.path.join(context_path, 'valset_features.csv')
+        logging.verbose(f'Loading valset features from {df_val_path}...')
+        df_val = pd.read_csv(df_val_path)
 
-    df_test_path = os.path.join(context_path, 'testset_features.csv')
-    logging.verbose(f'Loading testset features from {df_test_path}...')
-    df_test = pd.read_csv(df_test_path)
-    
-    max_age = max(df_train['age'].max(), df_test['age'].max())
-    max_age = max(max_age, df_val['age'].max())
+        df_test_path = os.path.join(context_path, 'testset_features.csv')
+        logging.verbose(f'Loading testset features from {df_test_path}...')
+        df_test = pd.read_csv(df_test_path)
+        
+        max_age = max(df_train['age'].max(), df_test['age'].max())
+        max_age = max(max_age, df_val['age'].max())
 
-    if config.settings.n_intervals is None:  
-        config.settings.n_intervals = int(max_age/window)
-    
-    config.settings.df_train = df_train
-    config.settings.df_val = df_val
-    config.settings.df_test = df_test
+        if config.settings.n_intervals is None:  
+            config.settings.n_intervals = int(max_age/window)
+        
+        config.settings.df_train = df_train
+        config.settings.df_val = df_val
+        config.settings.df_test = df_test
     
     logging.verbose(f'Features loaded!')

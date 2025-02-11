@@ -2,7 +2,7 @@ class Settings:
     def __init__(self):
         self.phase = None
         self.context_path = None
-        self.samples_path = None
+        self.auth_path = None
         self.threshold = None
         self.window = None
         self.rbound = None
@@ -10,6 +10,7 @@ class Settings:
         self.df_train = None
         self.df_val = None
         self.df_test = None
+        self.df_auth = None
         self.plot_mode = False
         self.verbose = False
         self.falcon_verbose = False
@@ -18,6 +19,7 @@ class Settings:
         self.samples_train = {}
         self.samples_test = {}
         self.samples_val = {}
+        self.samples_auth = {}
         self.execution_path = None
         self.n_intervals = None
         self.model = None
