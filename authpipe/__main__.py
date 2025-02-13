@@ -147,7 +147,6 @@ def extract_features(ctx, no_args_is_help=True, **kwargs):
     '--plot_results',
     is_flag=True,
     help='Plot results from training phase', 
-    required=True
 )
 @click.pass_context
 def train(ctx, no_args_is_help=True, **kwargs):
