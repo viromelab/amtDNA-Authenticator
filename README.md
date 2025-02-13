@@ -91,7 +91,7 @@ It will build the examples for each mode of the program in the output folder `ex
 
 ## Usage
 
-If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be the `examples/example_MODE` directory, with `MODE` being process_multifasta, extract_features, train or authenticate. In that case, the data will be already prepared and you can test the program in any mode with the corresponding step from 2 to 5.
+If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be the `examples/example_MODE` directory, with `MODE` being process_multifasta, extract_features, train or authenticate. In that case, the data will be already prepared and you can test the program in any mode with the corresponding step from 1 to 4.
 
 ### **0. Prepare Data:**
     * Create a `multifasta.fa` file containing ancient DNA sequences for training, validation and testing. Place it in a first directory. This will be your `context` directory.
@@ -108,7 +108,7 @@ If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be th
     ```
     * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path.
 
-### **3. Run the extract-features mode:**
+### **2. Run the extract-features mode:**
     * This mode will load the data processed in the processing-multifasta mode and stored in the context folder, processing it further to extract features for the input vector of the machine learning model.
 
     ```bash
@@ -118,7 +118,7 @@ If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be th
     * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path (It should be the same as the used in the process-multifasta mode!).
     * Flag --falcon_verbose (-f): Show FALCON verbose
 
-### **4. Run the train mode:**
+### **3. Run the train mode:**
     * This mode will train a machine learning model (Selected in command line) on the extracted features. 
 
     ```bash
@@ -129,7 +129,7 @@ If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be th
     * The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
     * Flag --plot_results [-p] Plot results from training phase
 
-### **5. Run the authenticate mode:**
+### **4. Run the authenticate mode:**
     * This mode authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN based on the models trained in the train mode.
 
     ```bash
