@@ -29,7 +29,9 @@ This repository contains code for a feature based machine learning tool for auth
 
 You will need python3 installed beforee proceeding!
 
-1. **Create a virtual environment (venv):**
+If you follow the example guide with prepared data in the `Example` section, you can jump this step for now. If you later prepare a new environment for another project, it is wise to come back to check these steps.
+
+0. **Create a virtual environment (venv):**
 
 ```
 $ sudo apt-get install python3-venv # Install venv if not previously installed
@@ -54,8 +56,7 @@ $ which pip
 
 Should return PATH_TO_YOUR_PROJECT/.venv/bin/pip
 
-
-2. **Install the required dependencies on your venv with pip:**
+1. **Install the required dependencies on your venv with pip:**
 
 ```
 $ pip install -r requirements.txt
