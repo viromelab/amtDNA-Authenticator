@@ -32,7 +32,7 @@ If you follow the example guide with prepared data in the `Example` section, you
 
 ### **0. Create a virtual environment (venv):**
 
-```bash
+```
 $ sudo apt-get install python3-venv # Install venv if not previously installed
 $ cd PATH_TO_YOUR_PROJECT
 $ python3 -m venv .venv # It created your venv in the hidden directory .venv (Use ls -la to see it)
@@ -43,13 +43,13 @@ Now you have a venv configured to work in without messing with your global pytho
 
 To check if it is correctly working, you can run:
 
-```bash
+```
 $ which python3
 ```
 
 And it should return PATH_TO_YOUR_PROJECT/.venv/bin/python3
 
-```bash
+```
 $ which pip
 ```
 
@@ -57,7 +57,7 @@ Should return PATH_TO_YOUR_PROJECT/.venv/bin/pip
 
 ### **1. Install the required dependencies on your venv with pip:**
 
-```bash
+```
 $ pip install -r requirements.txt
 ```
 
@@ -71,7 +71,7 @@ https://github.com/cobilab/falcon
 
 After installing, add falcon to your bin.
 
-```bash
+```
 $ cp PARENT_DIR/src/FALCON /usr/bin/
 ```
 
@@ -103,7 +103,7 @@ If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be th
 ### **1. Run the processing-multifasta mode:**
     * This mode will process the multifasta in the context folder, capitalizing the characters to ensure uniformity, removing duplicate samples, and dividing the data into training, validation and testing sets.
 
-    ```bash
+    ```
     authpipe process-multifasta --context PATH-TO-CONTEXT-DIRECTORY
     ```
     * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path.
@@ -111,7 +111,7 @@ If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be th
 ### **2. Run the extract-features mode:**
     * This mode will load the data processed in the processing-multifasta mode and stored in the context folder, processing it further to extract features for the input vector of the machine learning model.
 
-    ```bash
+    ```
     authpipe extract_features --context PATH-TO-CONTEXT-DIRECTORY
     ```
 
@@ -121,7 +121,7 @@ If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be th
 ### **3. Run the train mode:**
     * This mode will train a machine learning model (Selected in command line) on the extracted features. 
 
-    ```bash
+    ```
     authpipe train --context PATH-TO-CONTEXT-DIRECTORY --lbound L_BOUND --rbound R_BOUND --window WINDOW --model MODEL
     ```
 
@@ -132,7 +132,7 @@ If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be th
 ### **4. Run the authenticate mode:**
     * This mode authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN based on the models trained in the train mode.
 
-    ```bash
+    ```
     authpipe authenticate --context PATH-TO-CONTEXT-DIRECTORY --auth_path PATH-TO-AUTH-DIRECTORY --threshold THRESHOLD --model MODEL
     ```
     * Replace `PATH-TO-AUTH-DIRECTORY` with the path to a folder with the multi-FASTA containing the samples to be authenticated.
