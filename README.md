@@ -5,7 +5,6 @@
 
 This repository contains code for a feature based machine learning tool for authenticating ancient DNA samples. The pipeline uses FALCON scores and quantitative features (relative size, CG content, N content) extracted from the DNA sequences.
 
-
 ## Features
 
 * **FALCON Scores:**  Utilizes FALCON to generate similarity scores between the input DNA sequence and a reference database of DNA sequences.
@@ -31,9 +30,9 @@ You will need python3 installed beforee proceeding!
 
 If you follow the example guide with prepared data in the `Example` section, you can jump this step for now. If you later prepare a new environment for another project, it is wise to come back to check these steps.
 
-0. **Create a virtual environment (venv):**
+### **0. Create a virtual environment (venv):**
 
-```
+```bash
 $ sudo apt-get install python3-venv # Install venv if not previously installed
 $ cd PATH_TO_YOUR_PROJECT
 $ python3 -m venv .venv # It created your venv in the hidden directory .venv (Use ls -la to see it)
@@ -44,25 +43,25 @@ Now you have a venv configured to work in without messing with your global pytho
 
 To check if it is correctly working, you can run:
 
-```
+```bash
 $ which python3
 ```
 
 And it should return PATH_TO_YOUR_PROJECT/.venv/bin/python3
 
-```
+```bash
 $ which pip
 ```
 
 Should return PATH_TO_YOUR_PROJECT/.venv/bin/pip
 
-1. **Install the required dependencies on your venv with pip:**
+**1. Install the required dependencies on your venv with pip:**
 
-```
+```bash
 $ pip install -r requirements.txt
 ```
 
-2. **Install FALCON from the repository:**
+**2. Install FALCON from the repository:**
 
 You might need to first configure your github account with the correct public key permissions. For that, follow this link https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent.
 
@@ -70,6 +69,13 @@ After setting up your permissions, proceede to install FALCON from this link:
 
 https://github.com/cobilab/falcon
 
+After installing, add falcon to your bin.
+
+```bash
+$ cp PARENT_DIR/src/FALCON /usr/bin/
+```
+
+in which `PARENT_DIR` is the directory where you previously cloned falcon.
 
 ## Example
 
