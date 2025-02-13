@@ -72,9 +72,19 @@ https://github.com/cobilab/falcon
 
 ## Example
 
-To run an example
+Run the script `script/build_examples.sh`. From the amtDNA-Authenticator folder:
+
+```
+$ cd ./script/
+$ chmod +x build_examples.sh
+$ ./build_examples.sh
+```
+
+It will build the examples for each mode of the program from the data in the folder `example`. 
 
 ## Usage
+
+If you use the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be the `run_MODE` directory, with `MODE` being process_multifasta, extract_features, train or authenticate. In that case, the data will be already prepared and you can test the program in any mode with the corresponding step from 2 to 5.
 
 1. **Prepare Data:**
     * Create a `multifasta.fa` file containing ancient DNA sequences for training, validation and testing. Place it in a first directory. This will be your `context` directory.
@@ -99,6 +109,7 @@ To run an example
     ```
 
     * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path (It should be the same as the used in the process-multifasta mode!).
+    * Flag --falcon_verbose (-f): Show FALCON verbose
 
 4. **Run the train mode:**
     * This mode will train a machine learning model (Selected in command line) on the extracted features. 
@@ -109,6 +120,7 @@ To run an example
 
     * You can change the `--model` argument to use a different machine learning model.
     * The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
+    * Flag --plot_results [-p] Plot results from training phase
 
 5. **Run the authenticate mode:**
     * This mode authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN based on the models trained in the train mode.
@@ -127,9 +139,9 @@ To run an example
 
 ## License
 
-MIT License
+GPLv3 License
 
-Copyright (c) [Year] [Your Name]
+Copyright (c) [2025] [Denis Yamunaque]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
