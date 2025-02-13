@@ -12,7 +12,7 @@ samples_test = None
 samples_val = None
 
 def read_multifasta():
-    logging.verbose(f'Reading multi-FASTA...')
+    logging.info(f'Reading multi-FASTA...')
     
     phase = config.settings.phase
     context_path = config.settings.context_path
@@ -67,7 +67,7 @@ def read_multifasta():
         
         counter += 1
         samples[id] = [id, age, seq]
-
+        
     logging.verbose(f'Found {counter} different samples!')
 
     config.settings.samples = samples
@@ -76,7 +76,7 @@ def read_multifasta():
     
     
 def divide_set():
-    logging.verbose(f'Dividing samples into train, val and test sets...')
+    logging.info(f'Dividing samples into train, val and test sets...')
     
     samples = config.settings.samples
     samples_train = config.settings.samples_train
@@ -164,6 +164,8 @@ def divide_set():
 
 
 def load_sets():
+    logging.info(f'Loading Train, Val and Test sets...')
+    
     context_path = config.settings.context_path
 
     train_file_path = os.path.join(context_path, 'train_multifasta.fa')
@@ -172,7 +174,10 @@ def load_sets():
 
     max_age = 0
     
-    samples = samples_train = samples_val = samples_test = {}
+    samples = {} 
+    samples_train = {} 
+    samples_val = {} 
+    samples_test = {}
 
     if os.path.exists(train_file_path):
         logging.verbose(f'Loading train set from {train_file_path}...')
@@ -253,7 +258,7 @@ def load_sets():
         logging.error(f'Could not find val FASTA files to load in {val_file_path}')
         exit()
     
-    logging.verbose(f'Val samples loaded from {train_file_path}...')
+    logging.verbose(f'Val samples loaded from {val_file_path}...')
     
     if os.path.exists(test_file_path):
         logging.verbose(f'Loading test set from {test_file_path}...')
@@ -294,7 +299,7 @@ def load_sets():
         logging.error(f'Could not find test FASTA files to load in {test_file_path}')
         exit()
         
-    logging.verbose(f'Test samples loaded from {train_file_path}...')
+    logging.verbose(f'Test samples loaded from {test_file_path}...')
         
     samples = {**samples_train, **samples_val, **samples_test}
 
@@ -305,7 +310,7 @@ def load_sets():
     
 
 def get_falcon_scores():
-    logging.verbose(f'Calculating FALCON scores...')
+    logging.info(f'Calculating FALCON scores...')
     
     context_path = config.settings.context_path
     auth_path = config.settings.auth_path
@@ -356,7 +361,7 @@ def get_falcon_scores():
 
 
 def integrate_falcon_data():
-    logging.verbose(f'Integrating FALCON data...')
+    logging.info(f'Integrating FALCON data...')
     
     context_path = config.settings.context_path
     auth_path = config.settings.auth_path
@@ -394,7 +399,7 @@ def integrate_falcon_data():
 
 
 def get_falcon_estimations():
-    logging.verbose(f'Calculating FALCON estimations...')
+    logging.info(f'Calculating FALCON estimations...')
     
     context_path = config.settings.context_path
     auth_path = config.settings.auth_path
@@ -463,7 +468,7 @@ def get_falcon_estimations():
 
 
 def get_quantitative_data():
-    logging.verbose(f'Extracting quantitative features (CG content, relative size, N content)...')
+    logging.info(f'Extracting quantitative features (CG content, relative size, N content)...')
     
     context_path = config.settings.context_path
     auth_path = config.settings.auth_path
@@ -519,7 +524,7 @@ def get_quantitative_data():
 
 
 def merge_data():
-    logging.verbose(f'Merging feature\'s data...')
+    logging.info(f'Merging feature\'s data...')
     
     context_path = config.settings.context_path
     auth_path = config.settings.auth_path
@@ -548,6 +553,7 @@ def merge_data():
     idx = 0
     for sample_set in samples_sets:
         df_set = None
+        
         for id in sample_set:
             age = sample_set[id][1]
 
@@ -598,7 +604,7 @@ def extract_features():
 
 
 def load_features():
-    logging.verbose(f'Loading features...')
+    logging.info(f'Loading features...')
     
     context_path = config.settings.context_path
     auth_path = config.settings.auth_path
@@ -634,5 +640,4 @@ def load_features():
         config.settings.df_train = df_train
         config.settings.df_val = df_val
         config.settings.df_test = df_test
-    
     logging.verbose(f'Features loaded!')
