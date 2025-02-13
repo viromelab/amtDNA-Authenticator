@@ -1,4 +1,4 @@
-<img src="figures/ai_mt.png" alt="Alt Text" width="800" height="400">
+<img src="assets/ai_mt.png" alt="ai_mt" width="800" height="400">
 
 
 # A Machine Learning Tool for Authentication of Human Mitochondrial Ancient DNA
