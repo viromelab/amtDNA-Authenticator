@@ -171,11 +171,11 @@ def build_authenticator(model_name, plot_results):
         honest_coin_random_array.append(y_true.sum().values[0]/len(y_true))
         y_pred_ancient_array.append(y_pred.sum()/len(y_pred))
 
-        num_of_positives = y_true.sum().values[0]
+        num_of_ancient = y_true.sum().values[0]
         num_of_samples = len(y_true)
+        num_of_modern = num_of_samples - num_of_ancient
 
-        random_val = max(num_of_positives, num_of_samples -
-                         num_of_positives) / num_of_samples
+        random_val = max(num_of_ancient, num_of_modern) / num_of_samples
 
         random_array.append(random_val)
 
