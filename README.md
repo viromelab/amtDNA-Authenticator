@@ -24,119 +24,87 @@ This repository contains code for a feature based machine learning tool for auth
 * joblib
 * FALCON (needs to be installed separately)
 
-## Installation steps
-
-You will need python3 installed beforee proceeding!
-
-If you follow the example guide with prepared data in the `Example` section, you can jump this step for now. If you later prepare a new environment for another project, it is wise to come back to check these steps.
-
-### **0. Create a virtual environment (venv):**
+## Installation
 
 ```
-$ sudo apt-get install python3-venv # Install venv if not previously installed
-$ cd PATH_TO_YOUR_PROJECT
-$ python3 -m venv .venv # It created your venv in the hidden directory .venv (Use ls -la to see it)
-$ source .venv/bin/activate # Activate venv
+git clone git@github.com:viromelab/amtDNA-Authenticator.git
+cd amtDNA-Authenticator
+pip install -r requirements.txt
+pip install -e .
+git clone https://github.com/cobilab/falcon.git
+cd falcon/src/
+cmake .
+make
+cp FALCON ../../
+cd ../../
 ```
-
-Now you have a venv configured to work in without messing with your global python installation.
-
-To check if it is correctly working, you can run:
-
-```
-$ which python3
-```
-
-And it should return PATH_TO_YOUR_PROJECT/.venv/bin/python3
-
-```
-$ which pip
-```
-
-Should return PATH_TO_YOUR_PROJECT/.venv/bin/pip
-
-### **1. Install the required dependencies on your venv with pip:**
-
-```
-$ pip install -r requirements.txt
-```
-
-### **2. Install FALCON from the repository:**
-
-You might need to first configure your github account with the correct public key permissions. For that, follow this link https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent.
-
-After setting up your permissions, proceede to install FALCON from this link:
-
-https://github.com/cobilab/falcon
-
-After installing, add falcon to your bin.
-
-```
-$ cp PARENT_DIR/src/FALCON /usr/bin/
-```
-
-in which `PARENT_DIR` is the directory where you previously cloned falcon.
 
 ## Example
-
-Run the script `script/build_examples.sh`. From the amtDNA-Authenticator folder:
 
 ```
 $ cd ./script/
 $ chmod +x build_examples.sh
 $ source build_examples.sh
+$ cd ..
 ```
 
-It will build the examples for each mode of the program in the output folder `examples`. After running, the virtual environment will be already activated and the examples will be ready to run. Therefore, you do not need to prepare data, it is provided in the example in the correct format.
+It will build the examples for each mode of the program in the output folder `examples`. After running, the examples will be ready to run. Therefore, you do not need to prepare data, it is provided in the example in the correct format.
+
+## ** Preparing Data (Not needed if running example):**
+
+    - Create a `multifasta.fa` file containing ancient DNA sequences for training, validation and testing. Place it in a first directory. This will be your `context` directory.
+
+    - Create a `multifasta.fa` file containing ancient DNA sequences for authentication. Place it in a second directory. This will be your `auth` directory.
+
+    - DNA sequences headers must have the format `>ID_AGE`.
 
 ## Usage
 
-If you run the `build_example.sh` script, `PATH-TO-CONTEXT-DIRECTORY` will be the `examples/example_MODE` directory, with `MODE` being process_multifasta, extract_features, train or authenticate. In that case, the data will be already prepared and you can test the program in any mode with the corresponding step from 1 to 4.
-
-### **0. Prepare Data:**
-    * Create a `multifasta.fa` file containing ancient DNA sequences for training, validation and testing. Place it in a first directory. This will be your `context` directory.
-
-    * Create a `multifasta.fa` file containing ancient DNA sequences for authentication. Place it in a second directory. This will be your `auth` directory.
-
-    * DNA sequences headers must have the format `>ID_AGE`.
+You can jump to any step in the pipeline, since all data necessary to run in any mode is already available (e.g., data generated in step "2. Run the extract-features mode" that is needed to run step "3. Run the train mode" is already available in the context directory of the training example).
 
 ### **1. Run the processing-multifasta mode:**
-    * This mode will process the multifasta in the context folder, capitalizing the characters to ensure uniformity, removing duplicate samples, and dividing the data into training, validation and testing sets.
+
+    - This mode will process the multifasta in the context folder, capitalizing the characters to ensure uniformity, removing duplicate samples, and dividing the data into training, validation and testing sets.
 
     ```
-    authpipe process-multifasta --context PATH-TO-CONTEXT-DIRECTORY
+    cd examples/example_process_multifasta/
+    authpipe process-multifasta --context context
+    cd ..
     ```
-    * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path.
 
 ### **2. Run the extract-features mode:**
-    * This mode will load the data processed in the processing-multifasta mode and stored in the context folder, processing it further to extract features for the input vector of the machine learning model.
+
+    This command will load the data processed in the processing-multifasta mode and stored in the context folder, processing it further to extract features for the input vector of the machine learning model.
+
+    *Step 2 can take several hours.
 
     ```
-    authpipe extract_features --context PATH-TO-CONTEXT-DIRECTORY
+    authpipe extract_features --context ./context
     ```
 
-    * Replace `PATH-TO-CONTEXT-DIRECTORY` with the actual path (It should be the same as the used in the process-multifasta mode!).
-    * Flag --falcon_verbose (-f): Show FALCON verbose
+    - Flag --falcon_verbose (-f): Show FALCON verbose
 
 ### **3. Run the train mode:**
-    * This mode will train a machine learning model (Selected in command line) on the extracted features. 
+
+    - This command will train XGBoost model instances on the extracted features with thresholds from 100 to 6000 years old and window size of 100 years. At the end of the run, it will print the results.
 
     ```
-    authpipe train --context PATH-TO-CONTEXT-DIRECTORY --lbound L_BOUND --rbound R_BOUND --window WINDOW --model MODEL
+    authpipe train --context ./context --lbound 100 --rbound 6000 --window 100 --model XGB -p
     ```
 
-    * You can change the `--model` argument to use a different machine learning model.
-    * The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
-    * Flag --plot_results [-p] Plot results from training phase
+    - You can change the `--model` argument to use a different machine learning model.
+    - The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
+    - Flag --plot_results [-p] Plot results from training phase
 
 ### **4. Run the authenticate mode:**
-    * This mode authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN based on the models trained in the train mode.
+
+    - This command authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN with respect to a 2000 years threshold, based on the model instances trained in the previous step.
 
     ```
-    authpipe authenticate --context PATH-TO-CONTEXT-DIRECTORY --auth_path PATH-TO-AUTH-DIRECTORY --threshold THRESHOLD --model MODEL
+    authpipe authenticate --context ./context --auth_path ./auth --threshold 2000 --model XGB
     ```
-    * Replace `PATH-TO-AUTH-DIRECTORY` with the path to a folder with the multi-FASTA containing the samples to be authenticated.
-    * You can choose the model and threshold accordingly to the existent in the PATH-TO-CONTEXT-DIRECTORY/models folder.
+    
+    - You can choose the model and threshold accordingly to the existent in the `context/models` folder.
 
 ## Outputs
 

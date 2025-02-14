@@ -353,9 +353,9 @@ def get_falcon_scores():
         with open(os.devnull, 'w') as devnull:
             # ./FALCON -m 6:1:0:0/0 -m 11:10:0:0/0 -m 13:200:1:3/1  -g 0.85 -v -F -t 50 -n 6 -x top_n1.txt FASTA_SAMPLE MTDB
             if config.settings.falcon_verbose:
-                subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_path, temp_fasta_file_path, train_multifasta_file_path])
+                subprocess.run(['../../FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_path, temp_fasta_file_path, train_multifasta_file_path])
             else:            
-                subprocess.run(['FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_path, temp_fasta_file_path, train_multifasta_file_path], stdout=devnull, stderr=devnull)
+                subprocess.run(['../../FALCON', '-m', '6:1:0:0/0', '-m', '11:10:0:0/0', '-m', '13:200:1:3/1', '-g', '0.85', '-F', '-t', '50', '-n', '12', '-x', top_file_path, temp_fasta_file_path, train_multifasta_file_path], stdout=devnull, stderr=devnull)
 
         temp_fasta_file.close()
 

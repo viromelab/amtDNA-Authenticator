@@ -3,10 +3,6 @@
 unzip -o ../example_data.zip -d ../
 
 mkdir -p ../examples/
-python3 -m venv ../examples/.venv
-. ../examples/.venv/bin/activate
-pip install -r ../requirements.txt
-pip install -e ..
 
 mkdir -p ../examples/example_process_multifasta/context
 cp ../example_data/context/multifasta.fa ../examples/example_process_multifasta/context/multifasta.fa
