@@ -27,7 +27,7 @@ This repository contains code for a feature based machine learning tool for auth
 ## Installation
 
 ```bash
-git clone git@github.com:viromelab/amtDNA-Authenticator.git
+git clone https://github.com/viromelab/amtDNA-Authenticator.git
 cd amtDNA-Authenticator
 pip install -r requirements.txt
 pip install -e .
