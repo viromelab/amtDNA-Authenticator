@@ -62,7 +62,7 @@ It will build the examples for each mode of the program in the output folder `ex
 
 You can jump to any step in the pipeline, since all data necessary to run in any mode is already available (e.g., data generated in step "2. Run the extract-features mode" that is needed to run step "3. Run the train mode" is already available in the context directory of the training example).
 
-**1. Run the processing-multifasta mode:**
+### **1. Run the processing-multifasta mode:**
 
 This mode will process the multifasta in the context folder, capitalizing the characters to ensure uniformity, removing duplicate samples, and dividing the data into training, validation and testing sets.
 
