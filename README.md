@@ -50,7 +50,7 @@ $ cd ..
 
 It will build the examples for each mode of the program in the output folder `examples`. After running, the examples will be ready to run. Therefore, you do not need to prepare data, it is provided in the example in the correct format.
 
-## ** Preparing Data (Not needed if running example):**
+## Preparing Data (Not needed if running example):
 
     - Create a `multifasta.fa` file containing ancient DNA sequences for training, validation and testing. Place it in a first directory. This will be your `context` directory.
 
