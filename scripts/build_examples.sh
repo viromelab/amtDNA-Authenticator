@@ -27,5 +27,5 @@ cp ../example_data/context/val_multifasta.fa ../examples/example_authenticate/co
 cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate/context/test_multifasta.fa
 cp ../example_data/context/*.csv ../examples/example_authenticate/context/
 mkdir -p ../examples/example_authenticate/auth/
-cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate/auth/auth_multifasta.fa
+cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate/auth/multifasta.fa
 
