@@ -62,7 +62,7 @@ It will build the examples for each mode of the program in the output folder `ex
 
 You can jump to any step in the pipeline, since all data necessary to run in any mode is already available (e.g., data generated in step "2. Run the extract-features mode" that is needed to run step "3. Run the train mode" is already available in the context directory of the training example).
 
-### **1. Run the processing-multifasta mode:**
+### **1. Run the processing-multifasta mode**
 
 This mode will process the multifasta in the context folder, capitalizing the characters to ensure uniformity, removing duplicate samples, and dividing the data into training, validation and testing sets.
 
@@ -71,7 +71,7 @@ cd examples/example_process_multifasta/
 authpipe process-multifasta --context context
 ```
 
-### **2. Run the extract-features mode:**
+### **2. Run the extract-features mode**
 
 This command will load the data processed in the processing-multifasta mode and stored in the context folder, processing it further to extract features for the input vector of the machine learning model.
 
@@ -84,7 +84,7 @@ authpipe extract_features --context ./context
 
 - Use the flag --falcon_verbose [-f] to show FALCON verbose
 
-### **3. Run the train mode:** ###
+### **3. Run the train mode** ###
 
 This command will train XGBoost model instances on the extracted features with thresholds from 100 to 6000 years old and window size of 100 years. At the end of the run, it will print the results.
 
@@ -97,7 +97,7 @@ authpipe train --context ./context --lbound 100 --rbound 6000 --window 100 --mod
 - The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
 - Use flag --plot_results [-p] to plot results from training phase
 
-### **4. Run the authenticate mode:** ###
+### **4. Run the authenticate mode** ###
 
 This command authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN with respect to a 2000 years threshold, based on the model instances trained in the previous step.
 
