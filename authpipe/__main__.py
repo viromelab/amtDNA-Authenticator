@@ -192,12 +192,19 @@ def train(ctx, no_args_is_help=True, **kwargs):
     required=True
 )
 @click.option(
-    '-p',
+    '-a',
     '--auth_path',
     type=click.Path(writable=True, dir_okay=True, file_okay=False),
     show_default=True,
     help='Path to folder with multi-FASTA to authenticate and to save authentication context', 
     required=True
+)
+@click.option(
+    '-s',
+    '--single_path',
+    type=click.Path(writable=True, dir_okay=False, file_okay=True),
+    show_default=True,
+    help='Path to single FASTA file to authenticate', 
 )
 @click.pass_context
 def authenticate(ctx, no_args_is_help=True, **kwargs):

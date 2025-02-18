@@ -230,7 +230,7 @@ def authentication():
         context_path, 'models/model_' + model + '_' + str(threshold) + '.joblib')
     
     if not os.path.exists(model_file_path):
-        logging.error(f'Model trained with threshold {threshold} does not exist! Reviewe your context/models/ folder to see the available models or train a new one')
+        logging.error(f'Model {model} trained with threshold {threshold} does not exist! Reviewe your context/models/ folder to see the available models or train a new one')
         exit()
 
     model_instance = joblib.load(model_file_path)

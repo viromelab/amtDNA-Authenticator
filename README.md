@@ -95,15 +95,26 @@ authpipe --verbose train --context_path ./context --lbound 100 --rbound 6000 --w
 
 - Change `--model` argument to use a different machine learning model.
 - The `--window`, `--rbound`, and `--lbound` arguments control the age thresholds used for binary classification.
-- Use flag --plot_results [-p] to plot results from training phase
+- Use flag `--plot_results` [-p] to plot results from training phase
 
-### **4. Run the authenticate mode** ###
+### **4. Run the authenticate mode (Multi-FASTA)** ###
 
 This command authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN with respect to a 2000 years threshold, based on the model instances trained in the previous step.
 
 ```bash
 cd examples/example_authenticate/
 authpipe --verbose authenticate --context_path ./context --auth_path ./auth --threshold 2000 --model XGB
+```
+
+- You can choose the model and threshold accordingly to the existent in the `context/models` folder.
+
+### **5. Run the authenticate mode (Single-FASTA)** ###
+
+This command authenticates a new amtDNA sequence in a single FASTA format, classifying it as ANCIENT/MODERN with respect to a 2000 years threshold, based on the model instances trained in the previous step.
+
+```bash
+cd examples/example_authenticate/
+authpipe --verbose authenticate --context_path ./context --auth_path ./auth --threshold 2000 --model XGB --single_path I2473.fa
 ```
 
 - You can choose the model and threshold accordingly to the existent in the `context/models` folder.

@@ -17,10 +17,14 @@ def read_multifasta():
     phase = config.settings.phase
     context_path = config.settings.context_path
     auth_path = config.settings.auth_path
+    single_path = config.settings.single_path
 
     multifasta_file_path = os.path.join(context_path, 'multifasta.fa')  
     if phase == 'authenticate':
-        multifasta_file_path = os.path.join(auth_path, 'multifasta.fa')
+        if single_path:
+            multifasta_file_path = single_path
+        else:
+            multifasta_file_path = os.path.join(auth_path, 'multifasta.fa')
     
     multifasta_file = open(multifasta_file_path, 'r')
     multifasta = multifasta_file.read()
