@@ -20,12 +20,25 @@ cp ../example_data/context/val_multifasta.fa ../examples/example_train/context/v
 cp ../example_data/context/test_multifasta.fa ../examples/example_train/context/test_multifasta.fa
 cp ../example_data/context/*.csv ../examples/example_train/context/
 
-mkdir -p ../examples/example_authenticate/context
-cp ../example_data/context/multifasta.fa ../examples/example_authenticate/context/multifasta.fa
-cp ../example_data/context/train_multifasta.fa ../examples/example_authenticate/context/train_multifasta.fa
-cp ../example_data/context/val_multifasta.fa ../examples/example_authenticate/context/val_multifasta.fa
-cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate/context/test_multifasta.fa
-cp ../example_data/context/*.csv ../examples/example_authenticate/context/
-mkdir -p ../examples/example_authenticate/auth/
-cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate/auth/multifasta.fa
+mkdir -p ../examples/example_authenticate_multifasta/context
+cp ../example_data/context/multifasta.fa ../examples/example_authenticate_multifasta/context/multifasta.fa
+cp ../example_data/context/train_multifasta.fa ../examples/example_authenticate_multifasta/context/train_multifasta.fa
+cp ../example_data/context/val_multifasta.fa ../examples/example_authenticate_multifasta/context/val_multifasta.fa
+cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate_multifasta/context/test_multifasta.fa
+cp ../example_data/context/*.csv ../examples/example_authenticate_multifasta/context/
+mkdir -p ../examples/example_authenticate_multifasta/auth/
+cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate_multifasta/auth/multifasta.fa
+mkdir -p ../examples/example_authenticate_multifasta/context/models/
+cp ../example_data/context/models/* ../examples/example_authenticate_multifasta/context/models/
 
+mkdir -p ../examples/example_authenticate_single_fasta/context
+cp ../example_data/context/multifasta.fa ../examples/example_authenticate_single_fasta/context/multifasta.fa
+cp ../example_data/context/train_multifasta.fa ../examples/example_authenticate_single_fasta/context/train_multifasta.fa
+cp ../example_data/context/val_multifasta.fa ../examples/example_authenticate_single_fasta/context/val_multifasta.fa
+cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate_single_fasta/context/test_multifasta.fa
+cp ../example_data/context/*.csv ../examples/example_authenticate_single_fasta/context/
+mkdir -p ../examples/example_authenticate_single_fasta/auth/
+cp ../example_data/context/test_multifasta.fa ../examples/example_authenticate_single_fasta/auth/multifasta.fa
+mkdir -p ../examples/example_authenticate_single_fasta/context/models/
+cp ../example_data/context/models/* ../examples/example_authenticate_single_fasta/context/models/
+cp ../example_data/I2473.fa ../examples/example_authenticate_single_fasta/
