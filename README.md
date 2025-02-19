@@ -102,7 +102,7 @@ authpipe --verbose train --context_path ./context --lbound 100 --rbound 6000 --w
 This command authenticates new amtDNA sequences in multi-FASTA format, classifying them as ANCIENT/MODERN with respect to a 2000 years threshold, based on the model instances trained in the previous step.
 
 ```bash
-cd examples/example_authenticate/
+cd examples/example_authenticate_multifasta/
 authpipe --verbose authenticate --context_path ./context --auth_path ./auth --threshold 2000 --model XGB
 ```
 
@@ -113,7 +113,7 @@ authpipe --verbose authenticate --context_path ./context --auth_path ./auth --th
 This command authenticates a new amtDNA sequence in a single FASTA format, classifying it as ANCIENT/MODERN with respect to a 2000 years threshold, based on the model instances trained in the previous step.
 
 ```bash
-cd examples/example_authenticate/
+cd examples/example_authenticate_single_fasta/
 authpipe --verbose authenticate --context_path ./context --auth_path ./auth --threshold 2000 --model XGB --single_path I2473.fa
 ```
 

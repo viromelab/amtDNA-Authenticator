@@ -5,7 +5,7 @@ from authpipe.core.training_core import authentication
 
 def run_authenticate(threshold, model, context_path, auth_path, verbose, debug, single_path):
   
-  if single == None and auth_path == None:
+  if single_path == None and auth_path == None:
     logging.error(f'No path defined for authentication folder with multi-FASTA nor single FASTA')
     exit()
     
