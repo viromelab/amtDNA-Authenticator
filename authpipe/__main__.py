@@ -206,6 +206,12 @@ def train(ctx, no_args_is_help=True, **kwargs):
     show_default=True,
     help='Path to single FASTA file to authenticate', 
 )
+@click.option(
+    '-f',
+    '--falcon_verbose',
+    is_flag=True,
+    help='Show FALCON verbose', 
+)
 @click.pass_context
 def authenticate(ctx, no_args_is_help=True, **kwargs):
     """Authenticate samples from FASTA/multi-FASTA file as Modern/Ancient given a threshold age"""

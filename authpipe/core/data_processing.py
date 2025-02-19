@@ -549,14 +549,15 @@ def merge_data():
         
     falcon_features_path = os.path.join(env_path, 'falcon_estimations.csv')
     logging.verbose(f'Loading FALCON estimations from {falcon_features_path}...')
-    df_falcon_features = pd.read_csv(falcon_features_path)
+    df_falcon_features = pd.read_csv(falcon_features_path, dtype={'id': str})
     q_features_path = os.path.join(env_path, 'quantitative_data.csv')
     logging.verbose(f'Loading quantitative features from {q_features_path}...')
-    df_q_features = pd.read_csv(q_features_path)
+    df_q_features = pd.read_csv(q_features_path, dtype={'id': str})
 
     idx = 0
     for sample_set in samples_sets:
         df_set = None
+
         
         for id in sample_set:
             age = sample_set[id][1]
