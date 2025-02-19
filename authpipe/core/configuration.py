@@ -3,6 +3,7 @@ class Settings:
         self.phase = None
         self.context_path = None
         self.auth_path = None
+        self.single_path = None
         self.threshold = None
         self.window = None
         self.rbound = None
